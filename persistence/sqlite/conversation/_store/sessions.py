@@ -22,6 +22,7 @@ from persistence.sqlite.conversation._store.sql_common import (
 from persistence.sqlite.conversation._store.compression import (
     _CHAIN_CAP, _UNSET_CREATED_SQL, get_compression_chain, get_compression_tip,
 )
+from persistence.sqlite.conversation._store.bot_chat_listing import listed_visibility_clause
 from persistence.sqlite.conversation._store.core import CANONICAL_BOT_CHAT_TITLE, _delete_unreferenced_system_prompts, _session_row_dict
 from persistence.sqlite.conversation._store.messages import _bump_conversation_generation, _display_messages_from_conn, _is_explicit_fork_child_row
 from persistence.sqlite.conversation._store.portability import _compact_session_cols
@@ -1291,7 +1292,9 @@ def list_sessions_rich(
     # hidden) must still be reachable there, or nothing but direct DB access can bring
     # it back (#90946).
     if not include_hidden and not archived_only:
-        where_clauses.append("s.hidden = 0")
+        visible_sql, visible_params = listed_visibility_clause(holder)
+        where_clauses.append(visible_sql)
+        params.extend(visible_params)
     heads = {}
     from persistence.sqlite.conversation._store.local import exclude_superseded_segments
     if not include_children:
@@ -1396,7 +1399,9 @@ def list_sessions_rich(
             workspace_key=workspace_key,
         )
         if not include_hidden and not archived_only:
-            pinned_clauses.append("s.hidden = 0")
+            visible_sql, visible_params = listed_visibility_clause(holder)
+            pinned_clauses.append(visible_sql)
+            pinned_params.extend(visible_params)
         if heads:
             exclude_superseded_segments(holder, pinned_clauses, pinned_params)
         pinned_clauses.append("s.pinned = 1")
