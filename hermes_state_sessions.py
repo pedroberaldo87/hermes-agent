@@ -1326,6 +1326,7 @@ class SessionSessionsMixin:
         Storage interface: port as ``list_sessions_rich`` (``workspace_key`` is ``session.list``'s
         ``workspace`` filter)."""
         self.flush_for_read()  # rows carry token/cost totals
+        from hermes_state_bot_chat_listing import listed_visibility_clause
         where_clauses, params = _session_filter_where(
             exclude_children=not include_children, source=source, sources=sources, session_key=session_key,
             exclude_sources=exclude_sources, cwd_prefix=cwd_prefix, min_message_count=min_message_count,
@@ -1337,7 +1338,9 @@ class SessionSessionsMixin:
         # hidden) must still be reachable there, or nothing but direct DB access can bring
         # it back (#90946).
         if not include_hidden and not archived_only:
-            where_clauses.append("s.hidden = 0")
+            visible_sql, visible_params = listed_visibility_clause(self)
+            where_clauses.append(visible_sql)
+            params.extend(visible_params)
         heads = {}
         from hermes_state_local import exclude_superseded_segments
         if not include_children:
@@ -1442,7 +1445,9 @@ class SessionSessionsMixin:
                 workspace_key=workspace_key,
             )
             if not include_hidden and not archived_only:
-                pinned_clauses.append("s.hidden = 0")
+                visible_sql, visible_params = listed_visibility_clause(self)
+                pinned_clauses.append(visible_sql)
+                pinned_params.extend(visible_params)
             if heads:
                 exclude_superseded_segments(self, pinned_clauses, pinned_params)
             pinned_clauses.append("s.pinned = 1")
