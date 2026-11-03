@@ -36,7 +36,11 @@ export function usePublishRosterSnapshot({ data, live, roster, allMeta, activeSo
     // Tabs caption a bot chat by its bot (#99152); republished with the
     // roster so a rename follows and tiles restored at boot resolve.
     roster.forEach(bot => {
-      host.setWorkspaceOwnerLabel?.(botWorkspaceOwnerKey(bot), displayName(bot, botRosterMeta(bot, allMeta)))
+      const label = displayName(bot, botRosterMeta(bot, allMeta))
+
+      host.setWorkspaceOwnerLabel?.(botWorkspaceOwnerKey(bot), label)
+      // The same name on the bot's chat wherever else it shows (Sessions sidebar, a Sessions tab).
+      host.setBotChatLabel?.(String(bot?.name || ''), label)
     })
 
     if (Array.isArray(data?.sources)) {

@@ -43,6 +43,7 @@ import { useI18n } from '@/i18n'
 import type { ChatMessage } from '@/lib/chat-messages'
 import { isBlankSessionRow, NEW_SESSION_TITLE, sessionTitle } from '@/lib/chat-runtime'
 import { transcribeAudioClientDirect } from '@/lib/voice-client-direct'
+import { botChatCaption } from '@/store/bot-chat-labels'
 import { $botChatScopes } from '@/store/bot-chat-scope'
 import { createComposerAttachmentScope, draftTitleFor, takeSessionDraft } from '@/store/composer'
 import { $gatewaySwitching } from '@/store/gateway-switch'
@@ -773,9 +774,13 @@ function tileWorkspaceScope(storedSessionId: string): Parameters<typeof workspac
 /** The tab's CAPTION: a bot chat's owner name over the canonical stored title
  *  (#99152). The menu keeps `tileTitle` — rename/delete show the real row. */
 export function tileCaption(storedSessionId: string): string {
-  return workspaceOwnerTitle(
-    tileTitle(storedSessionId),
-    $sessionTiles.get().find(tile => tile.storedSessionId === storedSessionId)
+  const tile = $sessionTiles.get().find(candidate => candidate.storedSessionId === storedSessionId)
+
+  // Bot workspace tabs take the owner label; a Bot Chat opened from anywhere
+  // else (the Sessions sidebar) still reads as its bot.
+  return botChatCaption(
+    workspaceOwnerTitle(tileTitle(storedSessionId), tile),
+    tileStoredRow(storedSessionId)?.profile ?? tile?.ownerProfile
   )
 }
 
@@ -790,7 +795,11 @@ function tileDragPayload(storedSessionId: string): SessionDragPayload {
     ? (workspaceStoredTitle(named.title, tile) ?? sessionTitle(named))
     : tile?.workspaceTabTitle || draftTitleFor(storedSessionId) || NEW_SESSION_TITLE
 
-  return { id: storedSessionId, profile: stored?.profile ?? '', title: workspaceOwnerTitle(title, tile) }
+  return {
+    id: storedSessionId,
+    profile: stored?.profile ?? '',
+    title: botChatCaption(workspaceOwnerTitle(title, tile), stored?.profile ?? tile?.ownerProfile)
+  }
 }
 
 // ---------------------------------------------------------------------------

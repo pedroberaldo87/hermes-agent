@@ -7,6 +7,7 @@ import type { ClientSessionState } from '@/app/types'
 import { formatRefValue } from '@/components/assistant-ui/directive-text'
 import { type ChatMessage, type ChatMessagePart, chatMessageText, textPart } from '@/lib/chat-messages'
 import { foldPersonalityName } from '@/lib/personalities'
+import { botChatCaption } from '@/store/bot-chat-labels'
 import type { ComposerAttachment } from '@/store/composer'
 import type { SessionInfo } from '@/types/hermes'
 
@@ -63,7 +64,10 @@ export function markReasoningEffortPending(state: ClientSessionState): ClientSes
 }
 
 export function sessionTitle(session: SessionInfo): string {
-  return session.title?.trim() || session.preview?.trim() || 'Untitled session'
+  const title = session.title?.trim()
+
+  // A canonical Bot Chat reads as its bot, never as the shared identity title.
+  return (title && botChatCaption(title, session.profile)) || session.preview?.trim() || 'Untitled session'
 }
 
 /** What a session is called before it has been sent — and before its composer
