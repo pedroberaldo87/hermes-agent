@@ -62,7 +62,9 @@ def test_restored_sessions_keep_the_pin_and_the_sweeps_archive_provenance(tmp_pa
 
 def test_adopted_bot_chat_stays_the_hidden_canonical_chat(tmp_path):
     """Stranded-session adoption imports the donor's Bot Mode chat into the profile store; Bot Mode
-    chats are hidden, and hidden is what keeps the canonical one out of listings and the stale sweep."""
+    chats are hidden, and hidden is what keeps the canonical one out of the stale sweep and under its
+    rename guard. The canonical chat itself is listed (it is the bot's conversation); see
+    test_canonical_bot_chat_listed.py."""
     donor = SessionDB(db_path=tmp_path / "default.db")
     profile = SessionDB(db_path=tmp_path / "profile.db")
     try:
@@ -74,7 +76,7 @@ def test_adopted_bot_chat_stays_the_hidden_canonical_chat(tmp_path):
         assert profile.adopt_session_lineage_from(donor, SESSION_ID)["adopted"]
 
         assert profile.get_session(SESSION_ID)["hidden"]
-        assert SESSION_ID not in {s["id"] for s in profile.list_sessions_rich(limit=50)}
+        assert SESSION_ID in {s["id"] for s in profile.list_sessions_rich(limit=50)}
         assert profile.archive_stale_sessions(idle_days=0) == 0
         with pytest.raises(ValueError, match="canonical Bot Chat"):
             profile.set_session_title(SESSION_ID, "renamed")
