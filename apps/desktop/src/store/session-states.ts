@@ -2692,14 +2692,20 @@ export function migrateTilesForProfile(oldProfile: string, newProfile: string): 
 
   const renamedOwner = (owner: SessionProfileRoute | undefined) => renameLocalOwnerRoute(owner, from, to)
 
+  const renamedTile = <T extends StoredTile>(tile: T): T => {
+    const ownerRoute = renamedOwner(tile.ownerRoute)
+    const ownerProfile = tile.ownerProfile && normalizeProfileKey(tile.ownerProfile) === from ? to : tile.ownerProfile
+
+    return ownerRoute === tile.ownerRoute && ownerProfile === tile.ownerProfile
+      ? tile
+      : { ...tile, ownerProfile, ownerRoute }
+  }
+
   const moved = tilesByProfile[from]
 
   if (moved) {
     delete tilesByProfile[from]
-    tilesByProfile[to] = [
-      ...(tilesByProfile[to] ?? []),
-      ...moved.map(tile => ({ ...tile, ownerRoute: renamedOwner(tile.ownerRoute) }))
-    ]
+    tilesByProfile[to] = [...(tilesByProfile[to] ?? []), ...moved.map(renamedTile)]
   }
 
   const botTiles = tilesByProfile[BOTS_TILE_BUCKET]
@@ -2712,17 +2718,14 @@ export function migrateTilesForProfile(oldProfile: string, newProfile: string): 
   const allTiles = tilesByProfile[ALL_PROFILES]
 
   if (allTiles) {
-    tilesByProfile[ALL_PROFILES] = allTiles.map(tile => ({
-      ...tile,
-      ownerProfile: tile.ownerProfile && normalizeProfileKey(tile.ownerProfile) === from ? to : tile.ownerProfile,
-      ownerRoute: renamedOwner(tile.ownerRoute)
-    }))
+    tilesByProfile[ALL_PROFILES] = allTiles.map(renamedTile)
   }
 
+  // Live tiles too: the strip in view is saved back from the atom.
   const live = $sessionTiles.get()
-  const next = live.map(tile => (tile.ownerRoute ? { ...tile, ownerRoute: renamedOwner(tile.ownerRoute) } : tile))
+  const next = live.map(renamedTile)
 
-  if (next.some((tile, index) => tile !== live[index] && tile.ownerRoute !== live[index].ownerRoute)) {
+  if (next.some((tile, index) => tile !== live[index])) {
     $sessionTiles.set(next)
   }
 
