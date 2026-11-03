@@ -25,6 +25,7 @@ import {
 } from '@/components/pane-shell/workspace-scope'
 import { hostHas } from '@/lib/host-capabilities'
 
+import { $botChatLabels, botChatCaption } from './bot-chat-labels'
 import { $botChatScopes } from './bot-chat-scope'
 import { $tabFlashText } from './browser-tab-attention'
 import { normalizeProfileKey } from './profile'
@@ -56,7 +57,7 @@ export function browserTabTitle({ caption, needsInput, unread, working }: Browse
 }
 
 const $focusedCaption = computed(
-  [$focusedStoredSessionId, $sessions, $sessionTiles, $botChatScopes, $workspaceOwnerLabels],
+  [$focusedStoredSessionId, $sessions, $sessionTiles, $botChatScopes, $workspaceOwnerLabels, $botChatLabels],
   (focused, sessions, tiles, botChatScopes) => {
     if (!focused) {
       return ''
@@ -75,7 +76,7 @@ const $focusedCaption = computed(
       return ''
     }
 
-    const caption = workspaceOwnerTitle(title, scope)
+    const caption = botChatCaption(workspaceOwnerTitle(title, scope), row?.profile ?? tile?.ownerProfile)
     const profile = normalizeProfileKey(row?.profile ?? tile?.ownerProfile)
 
     // A bot's own name already says whose chat this is.

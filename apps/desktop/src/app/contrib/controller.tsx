@@ -58,6 +58,7 @@ import {
 import { type KeybindContribution, KEYBINDS_AREA } from '@/lib/keybinds/actions'
 import { TRANSCRIPT_DIRECTIVE_AREA, type TranscriptDirectiveContribution } from '@/lib/transcript-directives'
 import { setYoloEnabled } from '@/lib/yolo-session'
+import { botChatCaption } from '@/store/bot-chat-labels'
 import { $botChatScopes } from '@/store/bot-chat-scope'
 import { $connectionsRegistry } from '@/store/connection-registry-state'
 import { watchDeadSessionPrune } from '@/store/dead-session-prune'
@@ -507,9 +508,12 @@ const syncWorkspaceTitle = () => {
     // that. Keeping it here would re-register the pane on every keystroke.
     // A bot chat reads as its BOT: every canonical Bot Chat is stored under
     // the same name, which told two open bots apart by nothing (#99152).
-    title: workspaceOwnerTitle(
-      stored ? (workspaceStoredTitle(stored.title, botScope) ?? storedSessionTitle(stored)) : NEW_SESSION_TITLE,
-      botScope
+    title: botChatCaption(
+      workspaceOwnerTitle(
+        stored ? (workspaceStoredTitle(stored.title, botScope) ?? storedSessionTitle(stored)) : NEW_SESSION_TITLE,
+        botScope
+      ),
+      stored?.profile
     ),
     data: {
       // The tab's status dot — the SAME primitive the sidebar row and session
