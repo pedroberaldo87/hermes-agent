@@ -48,6 +48,7 @@ import type { PluginWorkspaceOptions, WorkspaceMode } from '@/contrib/types'
 import { deleteProfile, getLogs, getStatus, hermesApi, type HermesGateway } from '@/hermes'
 import { traceIdentityChange } from '@/lib/identity-trace'
 import { completeMcpDesktopOAuth } from '@/lib/mcp-dashboard-oauth'
+import { setBotChatLabel } from '@/store/bot-chat-labels'
 import {
   $gateway,
   activeGatewayConnectionId,
@@ -1223,6 +1224,9 @@ export const host = {
    *  chat's STORED title is an identity the backend resolves by name; this is
    *  the caption shown for it. Feature-detect on older desktops. */
   setWorkspaceOwnerLabel,
+
+  /** Name a bot's canonical chat wherever it shows, keyed by its profile. Feature-detect on older desktops. */
+  setBotChatLabel,
 
   /** Switch the visible main-pane workspace without unregistering retained panes. */
   setWorkspaceScope: (
