@@ -677,6 +677,32 @@ def test_sealed_payload_venv_is_runtime_provenance_without_facts(tmp_path, monke
 
 
 @pytest.mark.usefixtures("child_env")
+def test_boot_generation_superseded_by_later_commit_is_still_runtime_provenance(tmp_path, monkeypatch):
+    """A running backend keeps the generation it activated at boot (activate_dependencies never
+    switches a live process), so once a later sync commits another generation its own PYTHONPATH
+    names a generation the facts record no longer does. That entry must not reach a child: a
+    system python3 of another version loads its compiled modules and dies on import."""
+    from pm.environments import runtime_facts_path, site_packages
+    state = tmp_path / "install-state"
+    generations = state / "environments"
+    booted, committed = generations / "booted/venv", generations / "committed/venv"
+    for venv in (booted, committed):
+        venv.mkdir(parents=True)
+        (venv / "pyvenv.cfg").write_text("version = 3.14\n", encoding="utf-8")
+    monkeypatch.setattr("pm.environments.install_state_dir", lambda repo: state)
+    facts = runtime_facts_path(Path(__file__).resolve().parents[2])
+    facts.parent.mkdir(parents=True, exist_ok=True)
+    facts.write_text(json.dumps({"packages": {"venv": {"environment": str(committed)}}}), encoding="utf-8")
+    monkeypatch.setattr(local, "_in_venv", False)
+    monkeypatch.setattr(local, "_hermes_site_packages", None)
+    stray = generations / "booted/venv-backup/lib/python3.14/site-packages"
+    user_site = tmp_path / "user-site"
+    entries = [str(site_packages(booted)), str(stray), str(user_site)]
+    result = local._sanitize_subprocess_env({"PYTHONPATH": os.pathsep.join(entries)})
+    assert result["PYTHONPATH"].split(os.pathsep) == entries[1:]
+
+
+@pytest.mark.usefixtures("child_env")
 @pytest.mark.parametrize("shipped", ["phantom", "escapes-root"])
 def test_payload_venv_that_is_not_real_is_not_provenance(tmp_path, monkeypatch, shipped):
     """A stray manifest.json can name a venv that does not exist, or one that escapes its root:
