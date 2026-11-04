@@ -175,7 +175,7 @@ The mapping:
 hermes profile create coder --clone
 ```
 
-`--clone` creates a `hermes.coder` host block in `honcho.json` with `aiPeer: "coder"`, shared `workspace`, inherited `peerName`, `recallMode`, `writeFrequency`, `observation`, etc. The AI peer is eagerly created in Honcho so it exists before the first message.
+`--clone` creates a `hermes_coder` host block in `honcho.json` with `aiPeer: "coder"`, shared `workspace`, inherited `peerName`, `recallMode`, `writeFrequency`, `observation`, etc. The AI peer is eagerly created in Honcho so it exists before the first message. Every clone does this, whether made by the CLI, the dashboard or a Desktop Bot, and the block lands in the `honcho.json` the new profile reads: its own copy when it carries one, else the default profile's. `hermes update` adds the block to any existing profile that selects Honcho and lacks one.
 
 ### Existing profiles, backfill Honcho peers
 

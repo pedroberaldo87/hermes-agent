@@ -869,10 +869,10 @@ def _sync_profiles_after_update() -> None:
             print(f"→ Seeded .env for {len(backfilled)} profile(s) (empty placeholder): {', '.join(backfilled)}")
 
     with suppress(Exception):
-        from plugins.memory import import_provider_module
-        synced = import_provider_module("honcho", "cli").sync_honcho_profiles_quiet()
+        from hermes_cli.profile_memory_identity import backfill_memory_provider_identities
+        synced = backfill_memory_provider_identities()
         if synced:
-            print(f"\n-> Honcho: synced {synced} profile(s)")
+            print(f"\n-> Memory provider identity added for {len(synced)} profile(s): {', '.join(synced)}")
 
 
 def _refresh_cua_driver_after_update() -> None:

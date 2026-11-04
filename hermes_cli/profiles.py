@@ -1327,8 +1327,6 @@ def _bootstrap_profile_dir(profile_dir: Path, source_dir: Optional[Path],
     for relpath in _CLONE_SUBDIR_FILES:
         _clone_file(source_dir, profile_dir, relpath)
     _clone_plugins(source_dir, profile_dir)
-    from hermes_cli.profile_memory_config import _load_config_dict, active_memory_provider, clone_memory_provider_config
-    clone_memory_provider_config(source_dir, profile_dir, active_memory_provider(_load_config_dict(source_dir)))
     if sync_imports:  # a plain file at the profile root, written by the agent-importers plugin
         _clone_file(source_dir, profile_dir, "import-sync.json")
 
@@ -1405,6 +1403,8 @@ def create_profile(
             stripped = strip_channel_settings(staging, include_state=clone_all, source_dir=source_dir)
             if stripped:
                 logger.info("profile %s: cloned without messaging channels %s", canon, stripped)
+        from hermes_cli.profile_memory_identity import clone_memory_provider_state
+        clone_memory_provider_state(source_dir, staging, canon, copy_config=not clone_all)
         finish_profile_layout(staging, no_skills=no_skills, clone_all=clone_all, description=description, soul=soul)
         os.rename(staging, profile_dir)
     except BaseException:
