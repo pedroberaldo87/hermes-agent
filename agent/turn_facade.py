@@ -37,7 +37,11 @@ class TurnFacadeMixin:
         # Foreground priority is retained if the review does not acknowledge within the bounded deadline
         # (#84423).
         from agent.background_review import cancel_background_review_for_live_turn
+        from agent.memory_turn_sync import capture_turn_words
 
+        # The user's words are kept from here, whatever happens to the turn (agent/memory_turn_sync.py).
+        capture_turn_words(self, persist_user_message if persist_user_message is not None else user_message,
+                           display_kind=persist_user_display_kind, turn_author=turn_author)
         cancel_background_review_for_live_turn(self)
 
         from agent import relay_runtime
