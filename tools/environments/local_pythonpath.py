@@ -128,6 +128,28 @@ def _get_hermes_site_packages(env: dict) -> list[Path]:
     return result
 
 
+def _is_pm_generation_site_packages(entry: Path) -> bool:
+    """Is *entry* exactly the site-packages of a real PM generation of this install?
+
+    A running process keeps the generation it activated at boot (``activate_dependencies``
+    never switches a live process), so after a later sync commits another one its own
+    PYTHONPATH names a generation the facts record no longer selects. The generations dir is
+    PM-owned by construction, so this is path provenance, not a version heuristic."""
+    from pm.environments import install_state_dir, site_packages
+
+    generations = install_state_dir(Path(__file__).resolve().parents[2]) / "environments"
+    for candidate, root in ((entry, generations), (entry.resolve(), generations.resolve())):
+        try:
+            parts = candidate.relative_to(root).parts
+        except ValueError:
+            continue
+        if len(parts) < 2 or parts[1] != "venv":
+            return False
+        venv = root / parts[0] / "venv"
+        return (venv / "pyvenv.cfg").is_file() and _same_path(candidate, site_packages(venv))
+    return False
+
+
 def _strip_hermes_owned_pythonpath_and_runtime_markers(env: dict) -> None:
     """Strip Hermes-owned PYTHONPATH entries, then the runtime marker vars. Order is
     load-bearing: PYTHONPATH filtering runs BEFORE the markers go so a validated Windows
@@ -151,7 +173,8 @@ def _strip_hermes_owned_pythonpath(env: dict) -> None:
         return
     owned_paths = [*_get_hermes_site_packages(env), *_state()._hermes_repo_root_aliases]
     entries = pp.split(os.pathsep)
-    stripped = [e for e in entries if e and any(_same_path(Path(e), p) for p in owned_paths)]
+    stripped = [e for e in entries if e and (any(_same_path(Path(e), p) for p in owned_paths)
+                                             or _is_pm_generation_site_packages(Path(e)))]
     kept = [e for e in entries if e not in stripped]
     if kept:
         env["PYTHONPATH"] = os.pathsep.join(kept)
