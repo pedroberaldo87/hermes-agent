@@ -23,6 +23,7 @@ from agent.message_metadata import (
     TOOL_CALL_UIDS, merge_tool_call_uids, per_occurrence_tool_call_uids, record_absorbed_message)
 from agent.cache_bounds import publish_lru
 from agent.prompt_builder import STEER_DISPLAY_KIND, steer_user_row
+from agent.memory_turn_sync import capture_mid_turn_words
 from agent.tool_dispatch_helpers import _trajectory_normalize_msg, make_tool_result_message
 from agent.route_verdicts import ROUTE_VERDICT_FIELDS, reset_route_verdicts, reset_route_verdicts_if_moved
 from agent.think_scrubber import THINK_TAG_NAMES
@@ -3678,12 +3679,9 @@ def apply_pending_steer_to_tool_results(agent, messages: list, num_tool_msgs: in
     - message-role alternation stays legal — ``assistant(tool_calls) → tool →
       user`` is the documented "user jumped in mid-run" pattern that
       ``repair_message_sequence`` deliberately keeps;
-    - the appended dict carries no ``_DB_PERSISTED_MARKER`` yet, so the next
-      ``_flush_messages_to_session_db`` writes it to the session store — the
-      steer text finally becomes part of the durable transcript instead of
-      being smeared onto an already-persisted tool row that append-only
-      persistence never rewrites (replayed histories then diverge from the
-      live request bytes and break the provider prompt cache).
+    - the appended dict carries no ``_DB_PERSISTED_MARKER`` yet, so the next ``_flush_messages_to_session_db``
+      writes it to the session store, never smeared onto an already-persisted tool row that append-only
+      persistence never rewrites (replayed histories would diverge and break the provider prompt cache).
     """
     if num_tool_msgs <= 0 or not messages:
         return
@@ -3700,6 +3698,7 @@ def apply_pending_steer_to_tool_results(agent, messages: list, num_tool_msgs: in
         _requeue_pending_steer(agent, steer_text)
         return
     messages.append(steer_user_row(steer_text))
+    capture_mid_turn_words(agent, steer_text)  # external memory receives it with the turn's reply
     _ra().logger.info(
         "Delivered /steer to agent after tool batch (%d chars) as new user message: %s", len(steer_text),
         steer_text[:120] + ("..." if len(steer_text) > 120 else ""),

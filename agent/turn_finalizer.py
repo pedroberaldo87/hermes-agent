@@ -615,15 +615,20 @@ def public_pre_transform(agent, pre_transform: Optional[Any]) -> Optional[Any]:
 
 
 def _mirror_turn_to_memory(
-    agent, *, original_user_message, final_response, interrupted, messages, review_memory, review_skills, vetoed,
+    agent, *, original_user_message, final_response, interrupted, failed, messages, review_memory, review_skills,
+    vetoed,
 ) -> None:
     """External-memory sync (+ next prefetch), then the background memory/skill review. A prompt a
-    ``pre_llm_call`` hook vetoed never leaves the host, so neither runs for that turn."""
+    ``pre_llm_call`` hook vetoed never leaves the host: its captured words are discarded and neither runs. A failed
+    turn's reply is error/fallback text, not an answer: like an interrupt it sends nothing."""
     if vetoed:
+        manager = getattr(agent, "_memory_manager", None)
+        if manager is not None:
+            manager.discard_user_words(getattr(agent, "_turn_memory_token", None))
         return
     agent._sync_external_memory_for_turn(
         original_user_message=original_user_message, final_response=final_response,
-        interrupted=interrupted, messages=messages,
+        interrupted=interrupted or failed, messages=messages,
     )
     # Background memory/skill review runs AFTER delivery so it never competes with the
     # user's task. Suppressed by skip_background_review (e.g. cron): the fork costs
@@ -895,7 +900,7 @@ def finalize_turn(
 
     _mirror_turn_to_memory(
         agent, original_user_message=original_user_message, final_response=final_response,
-        interrupted=interrupted, messages=messages, review_memory=_should_review_memory,
+        interrupted=interrupted, failed=failed, messages=messages, review_memory=_should_review_memory,
         review_skills=_should_review_skills, vetoed=vetoed,
     )
 

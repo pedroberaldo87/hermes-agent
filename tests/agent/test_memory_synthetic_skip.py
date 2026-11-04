@@ -52,18 +52,27 @@ def _bare_agent():
     return agent
 
 
+def _turn(agent, text, reply):
+    """A turn through its real entry capture, then the finalizer's sync; the mock manager hands back what was
+    captured."""
+    from agent.memory_turn_sync import capture_turn_words
+
+    capture_turn_words(agent, text, display_kind=None, turn_author=None)
+    manager = agent._memory_manager
+    manager.take_user_words.return_value = [c.args[0] for c in manager.capture_user_words.call_args_list]
+    agent._sync_external_memory_for_turn(original_user_message=text, final_response=reply, interrupted=False)
+
+
 def test_sync_skips_notification_turn():
     agent = _bare_agent()
-    agent._sync_external_memory_for_turn(
-        original_user_message="[IMPORTANT: Background process proc_1 completed normally (exit code 0).",
-        final_response="Nothing to act on.", interrupted=False)
+    _turn(agent, "[IMPORTANT: Background process proc_1 completed normally (exit code 0).", "Nothing to act on.")
+    agent._memory_manager.capture_user_words.assert_not_called()
     agent._memory_manager.sync_all.assert_not_called()
     agent._memory_manager.queue_prefetch_all.assert_not_called()
 
 
 def test_sync_keeps_human_turn():
     agent = _bare_agent()
-    agent._sync_external_memory_for_turn(
-        original_user_message="I prefer Open Brain for infrastructure knowledge",
-        final_response="Noted.", interrupted=False)
+    _turn(agent, "I prefer Open Brain for infrastructure knowledge", "Noted.")
     agent._memory_manager.sync_all.assert_called_once()
+    assert agent._memory_manager.sync_all.call_args.args[0] == "I prefer Open Brain for infrastructure knowledge"
