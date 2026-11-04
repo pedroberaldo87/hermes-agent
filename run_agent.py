@@ -106,7 +106,6 @@ from tools.interrupt import set_interrupt as _set_interrupt
 from tools.browser_session_lifecycle import cleanup_browser
 from tools.connectors.turn import agent_connection_surface, scoped_connection_surface
 
-from agent.memory_provider import is_trivial_prompt, is_synthetic_notification_turn as _is_synthetic_notification_turn
 from agent.client_lifecycle import ClientLifecycleMixin
 from agent.stream_delivery import StreamDeliveryMixin
 from agent.status_output import StatusOutputMixin
@@ -887,42 +886,14 @@ class AIAgent(
 
     def _sync_external_memory_for_turn(self, *, original_user_message: Any, final_response: Any, interrupted: bool,
                                        messages: list | None = None) -> None:
-        """Mirror a completed turn into external memory providers (``sync_all`` + ``queue_prefetch_all``).
+        """Mirror the turn into external memory providers; rules in ``agent.memory_turn_sync``.
 
-        Uses ``original_user_message`` (``user_message`` may carry injected skill content). Interrupted turns
-        are skipped: partial output is not durable truth. Best-effort — an offline backend never blocks.
-
-        A partial assistant output, an aborted tool chain, or a mid-stream reset is not durable
-        conversational truth — mirroring it into an external memory backend pollutes future recall with
-        state the user never saw completed. The prefetch is gated on the same flag: the user's next message
-        is almost certainly a retry of the same intent, and a prefetch keyed on the interrupted turn would
-        fire against stale context. See #15218.
+        Interrupted turns never send their partial output (#15218): only the user's words survive, carried
+        by the next completed turn. Best-effort — an offline backend never blocks.
         """
-        if interrupted or not (self._memory_manager and final_response and original_user_message):
-            return
-        # System-injected turns (background-process completions/heartbeats/watch matches, async
-        # delegation and subagent completions) are not the user talking: syncing them makes the
-        # backend extract tool chatter as "facts" ("Background process proc_x completed ...") and
-        # burns extraction LLM time on it. Skip both the sync and the recall prefetch.
-        if _is_synthetic_notification_turn(original_user_message):
-            return
-        # Flatten multimodal parts to text (newline-joined for memory).
-        user_text = _summarize_user_message_for_log(original_user_message, sep="\n")
-        response_text = _summarize_user_message_for_log(final_response, sep="\n")
-        if not (user_text and response_text):
-            return
-        try:
-            sync_kwargs = {"session_id": self.session_id or "", **({"messages": messages} if messages is not None else {})}
-            # Stashed by build_turn_context() for this turn, None on a human turn.
-            turn_author = getattr(self, "_turn_author", None)
-            if turn_author is not None:
-                sync_kwargs["turn_author"] = turn_author
-            self._memory_manager.sync_all(user_text, response_text, **sync_kwargs)
-            # Sibling of the build_turn_context() prefetch gate: don't key recall on zero-signal prompts.
-            if not is_trivial_prompt(user_text):
-                self._memory_manager.queue_prefetch_all(user_text, session_id=self.session_id or "")
-        except Exception:
-            pass
+        from agent.memory_turn_sync import sync_external_memory_for_turn
+        sync_external_memory_for_turn(self, original_user_message=original_user_message, final_response=final_response,
+                                      interrupted=interrupted, messages=messages)
 
     def release_clients(self) -> None:
         """Release LLM clients, child agents and memory providers WITHOUT tearing down session tool state (gateway

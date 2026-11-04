@@ -55,6 +55,16 @@ _PROBE_INTERVAL_S = 60.0
 # Hard cap on calls in flight per (home, provider), orphans included: failed probes pin one more thread
 # each, so admission (probes too) stops here and a backend that stays wedged pins a bounded number.
 _MAX_INFLIGHT_CALLS = 16
+# The user's words one conversation may carry before a completed turn sends them.
+_MAX_PENDING_USER_WORDS = 16
+# ... and one profile, across its conversations (one that never completes another turn must not pin memory).
+_MAX_PENDING_USER_WORDS_PER_HOME = 256
+# (session_id, text, token, author, author_info) by profile home: the user's words, captured when accepted, sent by
+# the next completed turn of the same conversation and person, or on their own once that conversation is left.
+# Held by the process, not by one MemoryManager, because a gateway replaces a conversation's agent (/stop, /model,
+# idle eviction, /new) between the turn that captured them and the turn that sends them.
+_PENDING_USER_WORDS: dict[str, list[tuple[str, str, Optional[str], Optional[str], Optional[dict]]]] = {}
+_PENDING_USER_WORDS_LOCK = threading.Lock()
 
 
 # -- Signature introspection (providers are duck-typed; call shapes vary) -----
@@ -469,12 +479,23 @@ class MemoryManager:
         (tool outputs included) go through ``_redact_for_provider`` so secrets are never archived
         verbatim in a provider's store (#115104).
         """
+        job = self._sync_job(user_content, assistant_content, session_id=session_id, messages=messages,
+                             turn_author=turn_author)
+        if job is not None:
+            self._submit_background(job)
+
+    def _sync_job(self, user_content: str, assistant_content: str, *, session_id: str,
+                  messages: Optional[list[dict[str, Any]]] = None,
+                  turn_author: Optional[dict[str, Any]] = None) -> Optional[Callable[[], Any]]:
+        """``sync_all``'s write to every provider, redacted, as a callable; None when there is nothing to write.
+        A fork writes nothing (``_fork_turn_hooks_suppressed``), whether the words ride a turn or a left
+        conversation."""
         if self._fork_turn_hooks_suppressed():
-            return
+            return None
         providers = list(self._providers)
         clean_user_content = self._strip_skill_scaffolding(user_content) if providers else None
         if not clean_user_content or not self._owner_allows("sync_turn"):
-            return
+            return None
         clean_user_content, assistant_content, redacted_messages = _redact_for_provider(
             clean_user_content, assistant_content, messages)
         optional_kwargs = {"messages": redacted_messages, "turn_author": turn_author}
@@ -487,9 +508,126 @@ class MemoryManager:
             self._call_unless_stalled(
                 provider, lambda: provider.sync_turn(clean_user_content, assistant_content, **kwargs))
 
-        self._submit_background(
-            lambda: self._each_provider("sync_turn failed", _sync, level=logging.WARNING, providers=providers)
-        )
+        return lambda: self._each_provider("sync_turn failed", _sync, level=logging.WARNING, providers=providers)
+
+    def capture_user_words(self, text: str, *, session_id: str = "", token: Optional[str] = None,
+                           author: Optional[str] = None, author_info: Optional[dict[str, Any]] = None) -> None:
+        """Keep the user's words from the moment Hermes accepts them (a turn's message, a delivered /steer or
+        correction) until a completed turn of the same conversation sends them (``take_user_words``). A turn
+        that ends without a reply sends nothing, so its words wait for the next one (#15218 keeps the partial
+        reply out). The same text submitted again in a row (a retried turn) is kept once. ``author`` is who typed
+        it where a transport says (a gateway user id); in a group, one person's words never ride another's turn.
+        ``author_info`` is that author as the turn named them, kept for when the words are sent on their own.
+        Words a conversation still holds when it is left are sent on their own (``send_left_conversation_words``)."""
+        if not (text and text.strip()) or not self._providers or self._fork_turn_hooks_suppressed():
+            return
+        with _PENDING_USER_WORDS_LOCK:
+            pending = _PENDING_USER_WORDS.get(self._words_home(), [])
+            mine = [entry for entry in pending if entry[0] == session_id]
+            if mine and mine[-1][1].strip() == text.strip():
+                return
+            others = [entry for entry in pending if entry[0] != session_id]
+            kept = others + [*mine, (session_id, text, token, author, author_info)][-_MAX_PENDING_USER_WORDS:]
+            _PENDING_USER_WORDS[self._words_home()] = kept[-_MAX_PENDING_USER_WORDS_PER_HOME:]
+
+    def take_user_words(self, session_id: str = "", *, author: Optional[str] = None) -> list[str]:
+        """Return and clear the words ``author`` (or nobody in particular) left in ``session_id``, oldest first."""
+        taken: list[str] = []
+
+        def _take(entry: tuple):
+            if entry[0] == session_id and entry[3] in (author, None):
+                taken.append(entry[1])
+                return None
+            return entry
+
+        self._update_user_words(_take)
+        return taken
+
+    def discard_user_words(self, token: Optional[str]) -> None:
+        """Forget the words captured under ``token`` (a prompt a ``pre_llm_call`` hook vetoed)."""
+        if token is not None:
+            self._update_user_words(lambda entry: None if entry[2] == token else entry)
+
+    def pending_user_word_sessions(self) -> set[str]:
+        """The conversations of this profile that hold captured words no completed turn has sent yet."""
+        with _PENDING_USER_WORDS_LOCK:
+            return {entry[0] for entry in _PENDING_USER_WORDS.get(self._words_home(), [])}
+
+    def send_left_conversation_words(self, session_id: str, *, inline: bool = False) -> int:
+        """Send the words a conversation the user left still holds, on their own: user rows with no reply, in the
+        left conversation's name, one write per run of the same author. The next turn belongs to another
+        conversation, so they cannot ride it. ``inline`` writes now (a provider still bound to the left
+        conversation, before it switches); otherwise on the worker, ahead of the turn that found them.
+        Returns how many words were sent."""
+        released: list[tuple] = []
+
+        def _release(entry: tuple):
+            if entry[0] == session_id:
+                released.append(entry)
+                return None
+            return entry
+
+        if session_id:
+            self._update_user_words(_release)
+        self._send_released_words(released, session_id=session_id, inline=inline)
+        return len(released)
+
+    def _send_released_words(self, released: list[tuple], *, session_id: str, inline: bool) -> None:
+        runs: list[tuple[Optional[str], Optional[dict[str, Any]], list[str]]] = []
+        for entry in released:
+            author, info = entry[3], (entry[4] if len(entry) > 4 else None)
+            if runs and runs[-1][0] == author:
+                runs[-1][2].append(entry[1])
+            else:
+                runs.append((author, info, [entry[1]]))
+        for _author, info, texts in runs:
+            job = self._sync_job("\n\n".join(t for t in texts if t.strip()), "", session_id=session_id,
+                                 turn_author=info)
+            if job is None:
+                continue
+            if inline:
+                job()
+            else:
+                self._submit_background(job)
+        if released:
+            logger.info("External memory: sent %d word(s) the left conversation %s still held",
+                        len(released), session_id)
+
+    def _rebind_user_words(self, new_session_id: str, *, parent_session_id: str, carry: bool, rewound: bool) -> None:
+        """A compression rotation carries the parent's words to the child; a new, resumed, branched or reset
+        conversation sends the earlier conversation's on their own, before the providers switch. Words already
+        captured under ``new_session_id`` stay (``commit_session_boundary_async`` runs this on the worker,
+        after the new conversation may have captured its own) unless ``/undo`` rewound that very conversation.
+        Other conversations' words stay."""
+        released: list[tuple] = []
+
+        def _rebind(entry: tuple):
+            sid = entry[0]
+            if sid == new_session_id:
+                return None if rewound else entry
+            if parent_session_id and sid == parent_session_id:
+                if carry and new_session_id:
+                    return (new_session_id, *entry[1:])
+                released.append(entry)
+                return None
+            return entry
+
+        self._update_user_words(_rebind)
+        self._send_released_words(released, session_id=parent_session_id, inline=True)
+
+    def _words_home(self) -> str:
+        """The profile whose conversations these words belong to (as the stuck-call gate keys it)."""
+        return (self._bound_scope or {}).get("home_key") or self._home_key
+
+    def _update_user_words(self, change: Callable[[tuple], Any]) -> None:
+        """Replace each of this profile's pending entries with ``change(entry)``; a non-tuple result drops it."""
+        with _PENDING_USER_WORDS_LOCK:
+            home = self._words_home()
+            kept = [new for new in map(change, _PENDING_USER_WORDS.get(home, [])) if isinstance(new, tuple)]
+            if kept:
+                _PENDING_USER_WORDS[home] = kept
+            else:
+                _PENDING_USER_WORDS.pop(home, None)
 
     def _submit_background(self, fn, *, kind: str = "write") -> None:
         """Queue ``fn`` on the serialized worker (created lazily; None once shutting down) and track its
@@ -688,6 +826,9 @@ class MemoryManager:
         """Notify providers that ``AIAgent.session_id`` rotated without teardown
         (``/resume``, ``/branch``, ``/reset``, ``/new``, compression). ``rewound=True``
         (``/undo``): same id, truncated transcript."""
+        # /resume and /branch name a parent too; only a compression rotation continues the same conversation.
+        self._rebind_user_words(new_session_id, parent_session_id=parent_session_id, rewound=rewound,
+                                carry=kwargs.get("reason") == "compression" and not (reset or rewound))
         if not new_session_id or not self._owner_allows("on_session_switch"):
             return
         if rewound:  # forward only when set so it never pollutes providers' **kwargs
