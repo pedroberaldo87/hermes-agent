@@ -81,26 +81,42 @@ def is_trivial_prompt(text: Optional[str]) -> bool:
     return bool(TRIVIAL_PROMPT_RE.match(stripped))
 
 
-# System-injected "user" turns: background-process completions, heartbeats and watch matches,
-# async delegation / subagent completions. Same family as hermes_state_timeline._SYNTHETIC_PROMPT
-# (which hides them from the prompt index), plus the heartbeat form without "IMPORTANT:".
+# System-injected "user" turns: background-process completions (single and batched), heartbeats and
+# watch matches, async delegation / subagent completions, standing-goal continuations and /loop
+# wakeups. Same family as hermes_state_timeline._SYNTHETIC_PROMPT (which hides them from the prompt
+# index), plus the forms producers queue as plain text (hermes_cli.goals, hermes_cli.loops).
 SYNTHETIC_NOTIFICATION_RE = re.compile(
-    r"^\s*(?:\[(?:IMPORTANT: )?Background process |\[ASYNC (?:DELEGATION )?(?:BATCH )?COMPLETE\b|"
+    r"^\s*(?:\[(?:IMPORTANT: )?Background process |\[IMPORTANT: \d+ background process(?:es | results arrived )|"
+    r"\[IMPORTANT: (?:Watch patterns disabled for process |Watch-pattern )|"
+    r"\[ASYNC (?:DELEGATION )?(?:BATCH )?COMPLETE\b|\[ASYNC DELEGATION TASK FAILED\b|"
     r"A background fan-out of \d+ subagent\(s\) you dispatched earlier has finished\.|"
-    r"A background subagent you dispatched earlier has finished\.)",
+    r"A background subagent you dispatched earlier has finished\.|"
+    r"\[Continuing toward your standing goal\b|\[/loop wakeup #\d+|\[Heartbeat — recurring instruction\b|"
+    # TUI Kanban watcher (tui_gateway.session_notifications._format_kanban_event_text)
+    r"[✔⏸✖⏱🔄] (?:\[[^\]\n]+\] )?(?:@\S+ )?Kanban \S)",
     re.IGNORECASE,
 )
 
+# Persisted user-row kinds of turns that are not the user's words: a self-injected gateway/TUI event, a
+# producer's async-result card (gateway.response_filters.MACHINERY_DISPLAY_KINDS), the crash-recovery note,
+# and ``hidden`` — model-facing text no client renders as a user bubble (heartbeat wakes, muted diagnostic
+# notices, Desktop control/kickoff/widget sends; gateway/session_display.py). The turn's own type wins over
+# its text, which a producer may change.
+SYNTHETIC_TURN_DISPLAY_KINDS = frozenset({
+    "internal_notification", "process_complete", "async_delegation_complete", "auto_continue", "hidden",
+})
 
-def is_synthetic_notification_turn(message: Any) -> bool:
+
+def is_synthetic_notification_turn(message: Any, *, display_kind: Optional[str] = None) -> bool:
     """True when a turn's "user" message was injected by Hermes, not written by the user.
 
     External memory must not ingest these: the backend would extract tool chatter as facts about
-    the user. Detects ``TimelineNotification`` (it carries ``display_kind``) and, for copies that
-    lost the type (persisted/replayed rows), the notification text itself. Out-of-band user
-    messages are genuine user input and do not match.
+    the user. Detects the turn's persisted ``display_kind`` (``build_turn_context`` stashes it),
+    ``TimelineNotification`` (it carries ``display_kind``) and, for producers that queue plain text
+    or copies that lost the type (persisted/replayed rows), the notification text itself.
+    Out-of-band user messages are genuine user input and do not match.
     """
-    if getattr(message, "display_kind", None):
+    if display_kind in SYNTHETIC_TURN_DISPLAY_KINDS or getattr(message, "display_kind", None):
         return True
     if isinstance(message, list):  # multimodal: judge by the first text part
         message = next((p if isinstance(p, str) else p.get("text", "") for p in message
