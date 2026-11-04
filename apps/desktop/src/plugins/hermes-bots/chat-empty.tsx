@@ -1,7 +1,9 @@
 /**
- * What a bot's chat shows before it has said anything.
+ * What a bot's chat shows before it has said anything — its canonical Bot Chat
+ * and every new session opened for it (tab-strip "+" / ⌘T in Bot Mode, "New
+ * chat with this bot"), which core hands over by the owner key the tab carries.
  *
- * Core's splash is Hermes' own wordmark and belongs to a fresh draft; a bot
+ * Core's splash is Hermes' own wordmark and belongs to a generic draft; a bot
  * chat is neither. It gets the same lettering with the bot's name in it, over
  * the same face the roster row and tab carry, so an empty conversation still
  * says whose it is.
@@ -14,7 +16,7 @@ import { isBackfilledFacePng } from './avatar-image'
 import { $botMeta, $lastRoster } from './data'
 import { useBots } from './i18n'
 import { displayName } from './labels'
-import { botRosterMeta } from './routing'
+import { botRosterMeta, botWorkspaceOwnerKey } from './routing'
 import type { RosterRow } from './types'
 
 const FACE_SIZE = 96
@@ -48,13 +50,35 @@ function focusedStoredId(): string {
   return String(host.state.focusedStoredSessionId?.get?.() ?? '')
 }
 
-function botForChat(roster: readonly RosterRow[], sessionId: string): null | RosterRow {
-  // Stored ids pass straight through, so a shell that hands us one still
-  // resolves; otherwise the focused chat is the empty one being looked at.
-  return botForStoredId(roster, sessionId) ?? botForStoredId(roster, focusedStoredId())
+/** The bot a session was opened for: the roster row whose workspace owner key
+ *  is the one the tab carries. Opaque key match, never a name. */
+function botForOwner(roster: readonly RosterRow[], ownerKey: string | undefined): null | RosterRow {
+  if (!ownerKey || !Array.isArray(roster)) {
+    return null
+  }
+
+  return roster.find(bot => botWorkspaceOwnerKey(bot) === ownerKey) ?? null
 }
 
-export function BotChatEmpty({ sessionId }: { sessionId: string }) {
+function botForChat(roster: readonly RosterRow[], props: BotChatEmptyProps): null | RosterRow {
+  // The canonical chat first (by stored id; a shell that hands the stored id as
+  // `sessionId` still resolves), then the owner the session was opened for,
+  // then — older desktops pass neither — the focused chat.
+  return (
+    botForStoredId(roster, props.storedSessionId ?? '') ??
+    botForStoredId(roster, props.sessionId) ??
+    botForOwner(roster, props.workspaceOwnerKey) ??
+    (props.storedSessionId ? null : botForStoredId(roster, focusedStoredId()))
+  )
+}
+
+interface BotChatEmptyProps {
+  sessionId: string
+  storedSessionId?: string
+  workspaceOwnerKey?: string
+}
+
+export function BotChatEmpty(props: BotChatEmptyProps) {
   const b = useBots()
   // Subscribed, not read once: roster, metadata and focus all land after the
   // transcript mounts. This is also how the state appears at all — the slot
@@ -63,7 +87,7 @@ export function BotChatEmpty({ sessionId }: { sessionId: string }) {
   const roster = useValue($lastRoster)
   const allMeta = useValue($botMeta)
   useValue(host.state.focusedStoredSessionId)
-  const bot = botForChat(roster, sessionId)
+  const bot = botForChat(roster, props)
 
   if (!bot) {
     return null

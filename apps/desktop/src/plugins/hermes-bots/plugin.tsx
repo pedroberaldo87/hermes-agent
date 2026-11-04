@@ -731,7 +731,7 @@ export default {
       id: 'chat-empty',
       area: CHAT_EMPTY_AREA,
       data: {
-        render: ({ sessionId }: ChatEmptyProps) => <BotChatEmpty sessionId={sessionId} />
+        render: (props: ChatEmptyProps) => <BotChatEmpty {...props} />
       }
     })
 
