@@ -25,6 +25,11 @@ export const CHAT_EMPTY_AREA = 'chat.empty'
 export interface ChatEmptyProps {
   /** The live session whose transcript is empty. */
   sessionId: string
+  /** Its stored id, when the surface knows it (absent on older desktops). */
+  storedSessionId?: string
+  /** The Bot Mode owner the session was opened for (opaque key the tab
+   *  carries) — a bot's side chat, not only its canonical one. */
+  workspaceOwnerKey?: string
 }
 
 /** Payload of a `chat.empty` contribution's `data`. */

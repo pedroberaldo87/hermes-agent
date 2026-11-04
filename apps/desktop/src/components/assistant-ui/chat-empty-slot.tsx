@@ -1,9 +1,12 @@
+import { useStore } from '@nanostores/react'
 import type { FC } from 'react'
 import { useMemo } from 'react'
 
+import { useSessionView } from '@/app/chat/session-view'
+import { useWorkspaceOwnerKey } from '@/app/chat/workspace-owner'
 import { useContributions } from '@/contrib'
 import { ContribBoundary, ContribRender } from '@/contrib/react/boundary'
-import { CHAT_EMPTY_AREA, type ChatEmptyContribution } from '@/lib/chat-empty'
+import { CHAT_EMPTY_AREA, type ChatEmptyContribution, type ChatEmptyProps } from '@/lib/chat-empty'
 
 /**
  * The empty transcript's contributed slot. Mounts every registration and lets
@@ -22,14 +25,14 @@ import { CHAT_EMPTY_AREA, type ChatEmptyContribution } from '@/lib/chat-empty'
  * Mounting all of them means disjoint owners each work; two claiming the same
  * session render both, which is a visible conflict rather than a silent drop.
  */
-const ChatEmptyEntry: FC<{ id: string; render: ChatEmptyContribution['render']; sessionId: string }> = ({
+const ChatEmptyEntry: FC<{ id: string; props: ChatEmptyProps; render: ChatEmptyContribution['render'] }> = ({
   id,
-  render,
-  sessionId
+  props,
+  render
 }) => {
   // Stable component identity: ContribRender mounts this AS a component, so a
   // fresh closure per render would remount the empty state on every tick.
-  const renderEmpty = useMemo(() => () => render({ sessionId }), [render, sessionId])
+  const renderEmpty = useMemo(() => () => render(props), [render, props])
 
   return (
     <ContribBoundary id={id}>
@@ -40,6 +43,19 @@ const ChatEmptyEntry: FC<{ id: string; render: ChatEmptyContribution['render']; 
 
 export const ChatEmptySlot: FC<{ sessionId: string }> = ({ sessionId }) => {
   const contributions = useContributions(CHAT_EMPTY_AREA)
+  const storedSessionId = useStore(useSessionView().$storedId) ?? undefined
+  const workspaceOwnerKey = useWorkspaceOwnerKey(storedSessionId)
+
+  // Only defined keys: a contributor written against `{ sessionId }` sees the
+  // same shape it always did on a plain session.
+  const props = useMemo<ChatEmptyProps>(
+    () => ({
+      sessionId,
+      ...(storedSessionId ? { storedSessionId } : {}),
+      ...(workspaceOwnerKey ? { workspaceOwnerKey } : {})
+    }),
+    [sessionId, storedSessionId, workspaceOwnerKey]
+  )
 
   return (
     <>
@@ -47,7 +63,7 @@ export const ChatEmptySlot: FC<{ sessionId: string }> = ({ sessionId }) => {
         const render = (contribution.data as ChatEmptyContribution | undefined)?.render
 
         return render ? (
-          <ChatEmptyEntry id={contribution.id} key={contribution.id} render={render} sessionId={sessionId} />
+          <ChatEmptyEntry id={contribution.id} key={contribution.id} props={props} render={render} />
         ) : null
       })}
     </>
