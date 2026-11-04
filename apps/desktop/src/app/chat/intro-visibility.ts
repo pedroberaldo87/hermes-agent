@@ -12,6 +12,7 @@ import {
 } from '@/store/session'
 
 import { useSessionView } from './session-view'
+import { useWorkspaceOwnerKey } from './workspace-owner'
 
 /**
  * Whether the empty-chat intro splash renders.
@@ -37,8 +38,11 @@ export function shouldShowIntro(input: {
   routedSessionView: boolean
   selectedSessionId: null | string
   tileDraft?: boolean
+  /** The session was opened for a workspace owner (a bot): its owner's empty
+   *  state stands in the gap (`chat.empty` slot), not Hermes' generic splash. */
+  ownerScoped?: boolean
 }): boolean {
-  if (!input.enabled || input.auxiliaryWindow || !input.messagesEmpty) {
+  if (!input.enabled || input.auxiliaryWindow || !input.messagesEmpty || input.ownerScoped) {
     return false
   }
 
@@ -53,13 +57,14 @@ type IntroInput = Parameters<typeof shouldShowIntro>[0]
 
 /** `shouldShowIntro` for the surface rendering it: the primary chat, or a tab
  *  (whose new-session state comes from its row, see `useBlankTileDraft`). */
-export function useShowIntro(input: Omit<IntroInput, 'primary' | 'tileDraft'>): boolean {
+export function useShowIntro(input: Omit<IntroInput, 'ownerScoped' | 'primary' | 'tileDraft'>): boolean {
   const view = useSessionView()
   const primary = view.kind === 'primary'
   const storedSessionId = useStore(view.$storedId)
   const tileDraft = useBlankTileDraft(primary, storedSessionId)
+  const ownerScoped = Boolean(useWorkspaceOwnerKey(storedSessionId))
 
-  return shouldShowIntro({ ...input, primary, tileDraft })
+  return shouldShowIntro({ ...input, ownerScoped, primary, tileDraft })
 }
 
 /** A tab whose session is still a new one: its row is blank (no title, no
