@@ -7,7 +7,49 @@ vi.mock('@/store/gateway', () => ({
   requestGatewayForAgent: (...args: unknown[]) => requestGatewayForAgent(...args)
 }))
 
-import { createGatewaySession } from './session-create-request'
+const ensureGatewayAgent = vi.fn()
+const ensureGatewayProfile = vi.fn()
+
+vi.mock('@/store/profile', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ensureGatewayAgent: (...args: unknown[]) => ensureGatewayAgent(...args),
+  ensureGatewayProfile: (...args: unknown[]) => ensureGatewayProfile(...args)
+}))
+
+import { createGatewaySession, desktopSessionCreateParams } from './session-create-request'
+
+// The window activation before a create. A Bot Mode tab (the one caller that
+// omits the composer selection) creates on its own route and must not switch
+// the window; without a route the window gateway IS the transport, so it still
+// has to be on the requested profile.
+describe('desktopSessionCreateParams window activation', () => {
+  const route = { connectionId: 'cloud', mode: 'remote' as const, profile: 'writer', targetProfile: 'writer' }
+
+  beforeEach(() => {
+    ensureGatewayAgent.mockReset().mockResolvedValue(undefined)
+    ensureGatewayProfile.mockReset().mockResolvedValue(undefined)
+  })
+
+  it('does not activate a Bot Mode tab route on the window', async () => {
+    const params = await desktopSessionCreateParams('', route, undefined, false, false)
+
+    expect(ensureGatewayAgent).not.toHaveBeenCalled()
+    expect(ensureGatewayProfile).not.toHaveBeenCalled()
+    expect(params).toMatchObject({ profile: 'writer' })
+  })
+
+  it('activates the route for a foreground create', async () => {
+    await desktopSessionCreateParams('', route)
+
+    expect(ensureGatewayAgent).toHaveBeenCalledWith('cloud', 'writer')
+  })
+
+  it('keeps the legacy window switch when the Bot Mode create has no route', async () => {
+    await desktopSessionCreateParams('', null, 'writer', true, false)
+
+    expect(ensureGatewayProfile).toHaveBeenCalledWith('writer', { forceLegacyRoute: true })
+  })
+})
 
 // Verbatim admission rejections from older backends (tui_gateway/contracts/registry.py).
 const rejection = (field: string, suffix = '') =>
