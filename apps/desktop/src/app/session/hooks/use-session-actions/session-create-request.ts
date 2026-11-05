@@ -123,7 +123,15 @@ export async function desktopSessionCreateParams(
     normalizeProfileKey($activeGatewayProfile.get())
 
   if (capturedRoute) {
-    await ensureGatewayAgent(capturedRoute.connectionId, profile)
+    // A Bot Mode tab (the caller that omits the composer selection) targets its
+    // bot without switching the window: the create rides the bot's own route
+    // (retainGatewayForAgent + requestGatewayForAgent need no activation).
+    // Activating it republished the window's profile, the window refetched its
+    // catalogs, and session.create answered only after that burst — seconds
+    // per "+" / ⌘T.
+    if (includeComposerSelection) {
+      await ensureGatewayAgent(capturedRoute.connectionId, profile)
+    }
   } else if (legacyProfileIntent) {
     await ensureGatewayProfile(profile, { forceLegacyRoute: true })
   } else {
