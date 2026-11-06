@@ -21,6 +21,7 @@ import { frOnboarding } from './fr_onboarding'
 import { frPluginPreviewAccess } from './fr_plugin_preview_access'
 import { frPluginUpdate } from './fr_plugin_update'
 import { frPluginUpdateAll } from './fr_plugin_update_all'
+import { frPluginsInstalledView } from './fr_plugins_installed_view'
 import { frPreviewWeb } from './fr_preview_web'
 import { frProjects } from './fr_projects'
 import { frSharedMetrics } from './fr_shared_metrics'
@@ -2529,6 +2530,7 @@ export const frOverrides = {
       pinnedBadge: (sha: string) => `épinglé @ ${sha}`,
       ...frPluginUpdate,
       ...frPluginUpdateAll,
+      ...frPluginsInstalledView,
       ...frPluginPreviewAccess,
       uninstall: 'Désinstaller',
       uninstallTip: (name: string, profile: string) => `Désinstaller ${name} de ${profile}`,

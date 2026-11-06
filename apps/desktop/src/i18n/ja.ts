@@ -22,6 +22,7 @@ import { jaOnboarding } from './ja_onboarding'
 import { jaPluginPreviewAccess } from './ja_plugin_preview_access'
 import { jaPluginUpdateAll } from './ja_plugin_update_all'
 import { jaPluginSettings, jaPluginsTab } from './ja_plugins'
+import { jaPluginsInstalledView } from './ja_plugins_installed_view'
 import { jaPreviewWeb } from './ja_preview_web'
 import { jaProjects } from './ja_projects'
 import { jaSharedMetrics } from './ja_shared_metrics'
@@ -1321,7 +1322,7 @@ export const jaOverrides = {
 
   skillDeepLink: jaSkillDeepLink,
   skills: {
-    plugins: { ...jaPluginPreviewAccess, ...jaPluginsTab, ...jaPluginUpdateAll },
+    plugins: { ...jaPluginPreviewAccess, ...jaPluginsTab, ...jaPluginUpdateAll, ...jaPluginsInstalledView },
     hub: {
       search: '検索',
       searching: '検索中…',

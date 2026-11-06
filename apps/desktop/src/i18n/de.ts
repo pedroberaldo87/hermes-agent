@@ -20,6 +20,7 @@ import { deOnboarding } from './de_onboarding'
 import { dePluginPreviewAccess } from './de_plugin_preview_access'
 import { dePluginUpdate } from './de_plugin_update'
 import { dePluginUpdateAll } from './de_plugin_update_all'
+import { dePluginsInstalledView } from './de_plugins_installed_view'
 import { dePreviewWeb } from './de_preview_web'
 import { deProjects } from './de_projects'
 import { deSharedMetrics } from './de_shared_metrics'
@@ -2521,6 +2522,7 @@ export const deOverrides = {
       pinnedBadge: sha => `gepinnt @ ${sha}`,
       ...dePluginUpdate,
       ...dePluginUpdateAll,
+      ...dePluginsInstalledView,
       ...dePluginPreviewAccess,
       uninstall: 'Deinstallieren',
       uninstallTip: (name: string, profile: string) => `${name} aus ${profile} deinstallieren`,

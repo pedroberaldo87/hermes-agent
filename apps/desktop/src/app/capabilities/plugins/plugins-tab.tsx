@@ -5,13 +5,12 @@ import { getToolsets, setToolsetEnabled } from '@/api/toolsets'
 import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Switch } from '@/components/ui/switch'
 import { Tip } from '@/components/ui/tooltip'
 import { revokeGrantsIfUninstalled } from '@/contrib/plugin-files'
 import { $pluginRecords, enablePackageDesktopHalf, type PluginRecord, setPluginEnabled } from '@/contrib/plugins-store'
-import { useContributions } from '@/contrib/react/use-contributions'
 import { discoverRuntimePlugins, uninstallDiskPlugin } from '@/contrib/runtime-loader'
-import { pluginSettingsRouteHref, SETTINGS_PLUGINS_AREA } from '@/contrib/settings-pages'
 import type { ProfileScope } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { DESKTOP_PLUGIN_TOOLSETS } from '@/lib/desktop-toolsets'
@@ -48,7 +47,9 @@ import { type CatalogEntry, parseCatalog } from '../catalog/catalog-data'
 import { CatalogSwitch } from '../catalog/catalog-switch'
 import { TOOLSETS_QUERY_KEY } from '../toolsets/toolsets-data'
 
+import { InstalledPluginsList } from './installed-plugins-list'
 import { PluginFolderAccess } from './plugin-folder-access'
+import { packageRemoval, usePackageSettings } from './plugin-package-actions'
 import { mergePluginPackages, type PackageKind, type PluginPackage } from './plugin-packages'
 import { PluginPageAccess } from './plugin-page-access'
 import { runPluginUpdate } from './plugin-update'
@@ -148,7 +149,8 @@ const updateTargetLabel = (agent: AgentPluginRow) =>
   agent.catalog_version ?? agent.catalog_sha?.slice(0, 8) ?? shortTarget(agent.update_target)
 
 /** A full commit shortens to 8 characters; a feed version stays as it is. */
-const shortTarget = (target?: string) => (target && /^[0-9a-f]{40}$/i.test(target) ? target.slice(0, 8) : (target ?? ''))
+const shortTarget = (target?: string) =>
+  target && /^[0-9a-f]{40}$/i.test(target) ? target.slice(0, 8) : (target ?? '')
 
 function KindBadge({ kind }: { kind: PackageKind }) {
   const { t } = useI18n()
@@ -289,37 +291,14 @@ function PackageRow({
   const d = t.settings.plugins
   const desktop = pkg.desktop
   const agent = pkg.agent
-  // Settings live in Settings ▸ Plugins: a manifest `config_schema` gets an
-  // automatic page there, a desktop half may register its own. The gear is
-  // the shortcut to that page (#46600, #87934).
-  const settingsPages = useContributions(SETTINGS_PLUGINS_AREA)
-  const desktopSettings = Boolean(desktop && settingsPages.some(page => page.source === `plugin:${desktop.id}`))
-  const agentSettings = Boolean(agent?.key) && Boolean(agent?.settings_schema?.length)
-  const hasSettings = desktopSettings || agentSettings
-
-  const openSettings = () => {
-    // A desktop page absorbs the package's schema form as a sub-page, so its
-    // plugin id is the one entry that covers both halves. The link carries
-    // the profile THIS page has selected: Settings keeps its own scope, and
-    // without the hand-off the page would open (and save) that one instead.
-    const route = desktopSettings ? { plugin: desktop!.id } : { agent: agent!.key! }
-
-    window.location.hash = `#${pluginSettingsRouteHref(route, scope)}`
-  }
+  const openSettings = usePackageSettings(pkg, scope)
 
   const [desktopBusy, setDesktopBusy] = useState(false)
   const desktopOn = desktop ? desktop.status !== 'disabled' : false
   const agentOn = agent?.status === 'enabled'
   const agentToggleable = Boolean(agent?.key)
-  // Only what lives under the profile's plugins dir ("user", or "git" when it
-  // was cloned there) can be uninstalled here: bundled plugins are refused by
-  // the backend and entrypoint (pip-installed) ones go with their package.
-  const agentRemovable = agent?.source === 'user' || agent?.source === 'git'
+  const removal = packageRemoval(pkg)
   const unavailableServers = agent?.servers?.filter(server => server.state !== 'connected') ?? []
-  // A STANDALONE desktop plugin (a folder in <HERMES_HOME>/desktop-plugins with
-  // no agent package behind it) is deleted by Electron. A unified package's
-  // desktop half is not offered here: uninstalling the agent half prunes it.
-  const desktopRemovable = desktop?.kind === 'disk' && !desktop.packageName && !agent
   // Electron's desktop-half reconcile only walks THIS machine's homes, so a
   // package installed on a remote backend can never materialize here (#114079).
   const remoteBackend = useStore($connection)?.mode === 'remote'
@@ -432,7 +411,7 @@ function PackageRow({
           {/* Fixed slot for the settings gear: only plugins with a page in
             Settings ▸ Plugins (config_schema or a registered page) get one. */}
           <span className="flex size-7 shrink-0 items-center justify-center">
-            {hasSettings && (
+            {openSettings && (
               <Tip label={p.settingsToggle(pkg.name)}>
                 <Button aria-label={p.settingsToggle(pkg.name)} onClick={openSettings} size="icon" variant="ghost">
                   <Codicon name="settings-gear" size="0.85rem" />
@@ -521,7 +500,7 @@ function PackageRow({
 
         {/* Uninstall lives here, not on the card: the card only installs (+)
           and switches. Bundled and pip plugins have no row. */}
-        {agent && agentRemovable ? (
+        {agent && removal === 'agent' ? (
           <UninstallRow
             disabled={busy}
             name={pkg.name}
@@ -530,7 +509,7 @@ function PackageRow({
           />
         ) : (
           desktop &&
-          desktopRemovable && (
+          removal === 'desktop' && (
             <UninstallRow
               name={pkg.name}
               note={p.uninstallDesktopTip(pkg.name)}
@@ -580,6 +559,7 @@ export function PluginActions({ profile }: { profile: ProfileScope }) {
 /** Installed packages retain both halves' controls in the native detail pane.
  *  Browse shares the Skills catalog; navigation and search belong to the shell. */
 export const PluginsTab = memo(function PluginsTab({
+  initialView,
   profile,
   scopeSelector,
   scopeLabel,
@@ -591,6 +571,9 @@ export const PluginsTab = memo(function PluginsTab({
   onQueryChange?: (value: string) => void
   /** The profile selector governs only the Agent half, not the app-level Desktop half. */
   scopeSelector?: ReactNode
+  /** Landing view; Installed unless a caller (tests, a deep link into the
+   *  catalog) needs Discover first. */
+  initialView?: 'discover' | 'installed'
   /** Display name of the selected profile for the Agent half label. */
   scopeLabel?: string
 }) {
@@ -620,6 +603,10 @@ export const PluginsTab = memo(function PluginsTab({
   )
 
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
+  // Installed is the landing view: what the user has, with its switches,
+  // settings and uninstall. The catalog is one click away under Discover.
+  const [view, setView] = useState<'discover' | 'installed'>(initialView ?? 'installed')
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
 
   const packageForTarget = useCallback(
     (target: string) =>
@@ -642,6 +629,7 @@ export const PluginsTab = memo(function PluginsTab({
         if (pkg) {
           onQueryChange?.('')
           setSelectedEntryId(`installed:${pkg.key}`)
+          setExpandedKey(pkg.key)
         }
       },
       [onQueryChange, packageForTarget]
@@ -779,6 +767,55 @@ export const PluginsTab = memo(function PluginsTab({
     )
   }
 
+  const renderPackageDetail = (pkg: PluginPackage) => (
+    <PackageRow
+      busy={pkg.agent ? agentBusy(pkg.agent) : false}
+      key={pkg.key}
+      onAgentRemove={handleAgentRemove}
+      onAgentToggle={(row, enable) => {
+        if (!row.key) {
+          return
+        }
+
+        void toggleAgentPlugin(requestGateway, row.key, enable, p.toggleFailed(row.name), scope).then(ok => {
+          // Turning a unified package on turns its desktop half on too
+          // (unless the user switched that half off on purpose). Off
+          // stays per half: the desktop half is app-wide, and another
+          // profile may still run the agent half.
+          const half = pkg.desktop?.packageName
+
+          if (ok && enable && half) {
+            void enablePackageDesktopHalf(half, { keepUserChoice: true })
+          }
+        })
+      }}
+      onAgentUpdate={row => {
+        void runPluginUpdate(requestGateway, row, scope, p).then(outcome => {
+          if (outcome.kind === 'applied') {
+            void rescanAll(requestGateway, scope)
+          }
+        })
+      }}
+      onDesktopRemove={handleDesktopRemove}
+      pkg={pkg}
+      profile={profile}
+      request={requestGateway}
+      scope={scope}
+      scopeLabel={label}
+      scopeSelector={scopeSelector}
+    />
+  )
+
+  const uninstallPackage = (pkg: PluginPackage) => {
+    const removal = packageRemoval(pkg)
+
+    if (removal === 'agent' && pkg.agent) {
+      handleAgentRemove(pkg.agent, pkg.desktop)
+    } else if (removal === 'desktop' && pkg.desktop) {
+      handleDesktopRemove(pkg.desktop)
+    }
+  }
+
   const notice =
     status === 'error' ? (
       <CatalogAlert
@@ -790,72 +827,77 @@ export const PluginsTab = memo(function PluginsTab({
       </CatalogAlert>
     ) : null
 
-  return (
-    <CatalogBrowser
-      headerActions={<PluginActions profile={profile} />}
-      installedEntries={installedEntries}
-      installedPending={status !== 'ready'}
-      isInstalled={isInstalled}
-      kind="plugins"
-      matchInstalled={matchInstalled}
-      notice={notice}
-      // A plugin row's `source` IS its catalog tier (catalog-data.ts::catalogEntry);
-      // CatalogEntry has no `tier` field, so don't "fix" this to entry.tier.
-      onInstall={entry => openCatalogPluginInstall(entry, scope, { tier: entry.source })}
-      onQueryChange={onQueryChange}
-      query={query}
-      renderInstalledAction={entry => {
-        const pkg = packageById.get(entry.id)
+  const viewToggle = (
+    <div className="capabilities-page flex flex-wrap items-center gap-3 pt-4" data-plugins-view>
+      <SegmentedControl
+        onChange={setView}
+        options={[
+          { id: 'installed', label: `${p.viewInstalled} · ${packages.length}` },
+          { id: 'discover', label: p.viewDiscover }
+        ]}
+        sizing="content"
+        value={view}
+      />
+      {view === 'installed' && scopeSelector}
+    </div>
+  )
 
-        return pkg ? packageSwitch(pkg) : null
-      }}
-      renderInstalledDetail={entry => {
-        const pkg = packageById.get(entry.id)
-
-        if (!pkg) {
-          return null
-        }
-
-        return (
-          <PackageRow
-            busy={pkg.agent ? agentBusy(pkg.agent) : false}
-            key={pkg.key}
-            onAgentRemove={handleAgentRemove}
-            onAgentToggle={(row, enable) => {
-              if (!row.key) {
-                return
-              }
-
-              void toggleAgentPlugin(requestGateway, row.key, enable, p.toggleFailed(row.name), scope).then(ok => {
-                // Turning a unified package on turns its desktop half on too
-                // (unless the user switched that half off on purpose). Off
-                // stays per half: the desktop half is app-wide, and another
-                // profile may still run the agent half.
-                const half = pkg.desktop?.packageName
-
-                if (ok && enable && half) {
-                  void enablePackageDesktopHalf(half, { keepUserChoice: true })
-                }
-              })
-            }}
-            onAgentUpdate={row => {
-              void runPluginUpdate(requestGateway, row, scope, p).then(outcome => {
-                if (outcome.kind === 'applied') {
-                  void rescanAll(requestGateway, scope)
-                }
-              })
-            }}
-            onDesktopRemove={handleDesktopRemove}
-            pkg={pkg}
-            profile={profile}
-            request={requestGateway}
+  if (view === 'installed') {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        {viewToggle}
+        <div className="min-h-0 flex-1">
+          <InstalledPluginsList
+            busy={pkg => (pkg.agent ? agentBusy(pkg.agent) : false)}
+            expandedKey={expandedKey}
+            headerActions={<PluginActions profile={profile} />}
+            notice={notice}
+            onDiscover={() => setView('discover')}
+            onExpandedChange={setExpandedKey}
+            onQueryChange={onQueryChange}
+            onUninstall={uninstallPackage}
+            packages={packages}
+            pending={status !== 'ready'}
+            query={query}
+            renderDetail={renderPackageDetail}
+            renderSwitch={packageSwitch}
             scope={scope}
-            scopeLabel={label}
-            scopeSelector={scopeSelector}
           />
-        )
-      }}
-      selectedEntryId={selectedEntryId}
-    />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      {viewToggle}
+      <div className="min-h-0 flex-1">
+        <CatalogBrowser
+          headerActions={<PluginActions profile={profile} />}
+          installedEntries={installedEntries}
+          installedPending={status !== 'ready'}
+          isInstalled={isInstalled}
+          kind="plugins"
+          matchInstalled={matchInstalled}
+          notice={notice}
+          // A plugin row's `source` IS its catalog tier (catalog-data.ts::catalogEntry);
+          // CatalogEntry has no `tier` field, so don't "fix" this to entry.tier.
+          onInstall={entry => openCatalogPluginInstall(entry, scope, { tier: entry.source })}
+          onQueryChange={onQueryChange}
+          query={query}
+          renderInstalledAction={entry => {
+            const pkg = packageById.get(entry.id)
+
+            return pkg ? packageSwitch(pkg) : null
+          }}
+          renderInstalledDetail={entry => {
+            const pkg = packageById.get(entry.id)
+
+            return pkg ? renderPackageDetail(pkg) : null
+          }}
+          selectedEntryId={selectedEntryId}
+        />
+      </div>
+    </div>
   )
 })

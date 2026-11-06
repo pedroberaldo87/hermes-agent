@@ -21,6 +21,7 @@ import { esOnboarding } from './es_onboarding'
 import { esPluginPreviewAccess } from './es_plugin_preview_access'
 import { esPluginUpdate } from './es_plugin_update'
 import { esPluginUpdateAll } from './es_plugin_update_all'
+import { esPluginsInstalledView } from './es_plugins_installed_view'
 import { esPreviewWeb } from './es_preview_web'
 import { esProjects } from './es_projects'
 import { esSharedMetrics } from './es_shared_metrics'
@@ -2511,6 +2512,7 @@ export const esOverrides = {
       pinnedBadge: (sha: string) => `fijado @ ${sha}`,
       ...esPluginUpdate,
       ...esPluginUpdateAll,
+      ...esPluginsInstalledView,
       ...esPluginPreviewAccess,
       uninstall: 'Desinstalar',
       uninstallTip: (name: string, profile: string) => `Desinstalar ${name} de ${profile}`,
