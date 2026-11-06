@@ -88,6 +88,9 @@ interface PaneChrome extends PaneSizing {
    *  until the next launch. The ✕ follows the verb (see `PaneTab.onClose`),
    *  so dropping the verb here is what takes the chip off the tab. */
   hideOnly?: boolean
+  /** Runs when the user clicks this pane's TAB, including a click on the tab
+   *  that is already active (the SESSIONS tab leaves a full page this way). */
+  onTabActivate?: () => void
   /** Wrap this pane's TAB (e.g. in a domain context menu — a session tile's
    *  pin/branch/rename/archive/delete). The wrapper must render `tab` as its
    *  interactive child; the zone's own strip menu still owns non-tab space. */
