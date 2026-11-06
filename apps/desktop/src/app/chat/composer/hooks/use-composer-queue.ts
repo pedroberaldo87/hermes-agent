@@ -15,6 +15,7 @@ import {
   enqueueQueuedPrompt,
   getQueuedPrompts,
   isSteerableEntry,
+  logQueuedSubmitFailure,
   MAX_AUTO_DRAIN_ATTEMPTS,
   migrateQueuedPrompts,
   promoteQueuedPrompt,
@@ -709,6 +710,12 @@ export function useComposerQueue({
 
       const fails = (drainFailuresRef.current.get(entry.id) ?? 0) + 1
       drainFailuresRef.current.set(entry.id, fails)
+      logQueuedSubmitFailure('attempt-failed', {
+        key: activeQueueSessionKey,
+        entry: entry.id,
+        attempt: fails,
+        max: MAX_AUTO_DRAIN_ATTEMPTS
+      })
 
       if (fails >= MAX_AUTO_DRAIN_ATTEMPTS) {
         notify({

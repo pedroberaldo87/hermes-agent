@@ -731,3 +731,10 @@ export const shouldAutoDrain = ({ isBusy, parked, queueLength }: AutoDrainInput)
 /** Auto-drain attempts for one entry before we stop retrying and toast. The
  * entry stays queued for a manual send; a remount/reconnect resets the count. */
 export const MAX_AUTO_DRAIN_ATTEMPTS = 4
+
+/** One `[queue-drain]` line in desktop.log, which keeps only renderer `console.error`. A drain
+ *  swallows most refusals (busy, drift, lock) as a bare `false`, so without it the "Queued
+ *  message not sent" toast has no recorded cause. Callers never pass the queued text. */
+export function logQueuedSubmitFailure(stage: string, detail: Record<string, unknown> = {}): void {
+  console.error(`[queue-drain] ${stage} ${JSON.stringify(detail)}`)
+}
