@@ -1,10 +1,12 @@
 import { atom, onMount } from 'nanostores'
 import type { ReactNode } from 'react'
 
-import { noteActiveTreeGroup, revealTreePane } from '@/components/pane-shell/tree/store'
+import { findGroupOfPane } from '@/components/pane-shell/tree/model'
+import { $layoutTree, noteActiveTreeGroup, revealTreePane } from '@/components/pane-shell/tree/store'
 import { registry } from '@/contrib/registry'
 import type { Contribution } from '@/contrib/types'
 import type { InterfaceTier } from '@/store/interface-mode'
+import { openRouteTile, routeTilePaneId } from '@/store/route-tiles'
 
 type NavigateLike = (to: string, options?: { replace?: boolean }) => void
 
@@ -257,17 +259,21 @@ export function isWorkspacePageRoute(to: string): boolean {
   return view !== 'chat' && !isOverlayView(view)
 }
 
-/** True while the workspace pane shows a FULL PAGE (skills/messaging/
- *  artifacts/plugin routes) instead of the chat. Published by the wiring
- *  (which owns the router location); the workspace pane contribution mirrors
- *  it as `headerVeto` so the zone tab bar stands down on pages. Overlays
- *  (settings/…) don't count — the chat stays beneath them. */
+/** True while the workspace pane shows a FULL PAGE instead of the chat.
+ *  Pages now open as their own tab (`openWorkspacePage`) and the router is
+ *  bounced back to the chat, so this stays false; its readers (headerVeto,
+ *  close-tab, focus keys) keep their chat behaviour. Overlays never count. */
 export const $workspaceIsPage = atom(false)
 
+function revealWorkspacePane(): void {
+  noteActiveTreeGroup(null)
+  revealTreePane('workspace')
+}
+
 /** The chat route the workspace showed last (a session, or `/` for a draft).
- *  A full page replaces the chat in the workspace pane, and nothing else on
- *  screen leads back to it: the sidebar's SESSIONS tab and the page's close
- *  button use this to return there. Overlays never write it. */
+ *  Pages open as their own tab and never replace the chat, so a navigation
+ *  that lands the router on a page bounces it back here (see
+ *  `syncWorkspaceRoute`). Overlays and pages never write it. */
 export const $lastChatRoute = atom<string>(NEW_CHAT_ROUTE)
 
 /** Page-owned controls (kanban's board switcher) projected into the workspace
@@ -276,73 +282,84 @@ export const $lastChatRoute = atom<string>(NEW_CHAT_ROUTE)
  *  mounted on every route so plugin components never remount on navigation. */
 export const WORKSPACE_PAGE_HEADER_AREA = 'workspace.pageHeader'
 
-function revealWorkspacePane(): void {
+/**
+ * Open the page at `to` (a page route, optionally with its query) as its OWN
+ * tab in the main zone, next to the session, and front it. A page used to
+ * render inside the `workspace` pane and take over the session's tab; now the
+ * session stays where it was and the page is a tab you close with its ×.
+ * Already open: the tab is fronted and takes `to`'s query (a deep link into
+ * another Capabilities tab reuses it).
+ */
+export function openWorkspacePage(to: string): void {
+  const path = routePathname(to)
+  const query = to.slice(path.length).split('#')[0] ?? ''
+
   noteActiveTreeGroup(null)
-  revealTreePane('workspace')
+  openRouteTile(path, 'center', query)
+  revealTreePane(routeTilePaneId(path))
 }
 
 /**
- * Point the workspace at `pathname`: mirror "showing a full page" into
- * `$workspaceIsPage`, and FRONT the pane when it is one.
- *
- * A page renders inside `workspace`, so a main zone parked on a session tile
- * keeps the tile on screen while the route and the page content change behind
- * it — the navigation looks dead (#72602). Session switches already front the
- * pane in `store/session-states.ts`; pages had no equivalent.
+ * Point the workspace at the router location. Returns the chat route to
+ * bounce the router back to when the location is a PAGE (Capabilities,
+ * Messaging, Artifacts, a contributed route): the page opens as its own tab
+ * (`openWorkspacePage`) and the session keeps the main tab. Null otherwise.
  *
  * The router location drives this, so every entry point gets it without opting
  * in: sidebar, keybinds, command palette, Command Center, contributed
- * statusbar/titlebar `to` targets, back/forward, and cold-start restore.
+ * statusbar/titlebar `to` targets, `#/capabilities?…` links, back/forward,
+ * cold-start restore — and a page in a tab writing its own URL state, which
+ * lands here as `path?query` and becomes that tab's query.
  */
-export function syncWorkspaceRoute(pathname: string): void {
-  const isPage = isWorkspacePageRoute(pathname)
+export function syncWorkspaceRoute(pathname: string, search = ''): null | string {
+  if (isWorkspacePageRoute(pathname)) {
+    openWorkspacePage(`${routePathname(pathname)}${search}`)
 
-  if (isPage !== $workspaceIsPage.get()) {
-    $workspaceIsPage.set(isPage)
+    return $lastChatRoute.get() || NEW_CHAT_ROUTE
   }
 
-  if (isPage) {
-    revealWorkspacePane()
-  } else if (appViewForPath(pathname) === 'chat') {
+  if ($workspaceIsPage.get()) {
+    $workspaceIsPage.set(false)
+  }
+
+  if (appViewForPath(pathname) === 'chat') {
     $lastChatRoute.set(routePathname(pathname))
   }
+
+  return null
 }
 
 /**
- * Leave the full page the workspace is showing and return to the last chat.
- * No-op (returns false) when the workspace already shows a chat, so a click on
- * the SESSIONS tab never re-navigates a session the user is reading.
+ * Front the session tab of the main zone when a page tab covers it. The
+ * sidebar's SESSIONS tab uses this: clicking it while Plugins is on screen
+ * used to leave Plugins there. False (no-op) when the zone already shows a
+ * session, so a click never moves a tab the user is reading.
  */
-export function leaveWorkspacePage(navigate?: NavigateLike): boolean {
-  if (!$workspaceIsPage.get()) {
+export function showSessionTab(): boolean {
+  const tree = $layoutTree.get()
+  const zone = tree ? findGroupOfPane(tree, 'workspace') : null
+
+  if (!zone?.active?.startsWith(routeTilePaneId(''))) {
     return false
   }
 
-  const to = $lastChatRoute.get() || NEW_CHAT_ROUTE
-
-  if (navigate) {
-    navigate(to)
-  } else {
-    // Outside React (pane chrome): the HashRouter follows the hash.
-    window.location.hash = `#${to}`
-  }
+  revealWorkspacePane()
 
   return true
 }
 
 /**
- * Navigate to `to`, fronting the workspace pane when it is a page route.
- *
- * `syncWorkspaceRoute` covers route CHANGES; this covers the RE-CLICK, the one
- * case it can't see — hitting Capabilities while already on `/capabilities` with a
- * tile focused leaves the location untouched, so no effect fires and only an
- * imperative reveal brings the page back. Use it wherever a nav affordance can
- * be triggered from the page it targets.
+ * Navigate to `to`; a page route opens (or fronts) its own tab instead and
+ * leaves the router on the session. Use it wherever a nav affordance can be
+ * triggered from the page it targets: the re-click changes no location, so
+ * only this imperative open fronts the tab.
  */
 export function navigateToWorkspacePage(navigate: NavigateLike, to: string, options?: { replace?: boolean }): void {
-  navigate(to, options)
-
   if (isWorkspacePageRoute(to)) {
-    revealWorkspacePane()
+    openWorkspacePage(to)
+
+    return
   }
+
+  navigate(to, options)
 }

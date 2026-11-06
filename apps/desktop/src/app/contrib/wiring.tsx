@@ -117,14 +117,7 @@ import { RemoteFolderPicker } from '../right-sidebar/files/remote-picker'
 import { resetProjectTreeState } from '../right-sidebar/files/use-project-tree'
 import { PersistentTerminal } from '../right-sidebar/terminal/persistent'
 import { closeAllTerminals } from '../right-sidebar/terminal/terminals'
-import {
-  CRON_ROUTE,
-  navigateToWorkspacePage,
-  routeSessionId,
-  sessionRoute,
-  SETTINGS_ROUTE,
-  syncWorkspaceRoute
-} from '../routes'
+import { CRON_ROUTE, navigateToWorkspacePage, routeSessionId, sessionRoute, SETTINGS_ROUTE } from '../routes'
 import { SessionImportView } from '../session-import'
 import { SessionPickerOverlay } from '../session-picker-overlay'
 import { SessionSwitcher } from '../session-switcher'
@@ -172,6 +165,7 @@ import { useDesktopMetrics } from './hooks/use-desktop-metrics'
 import { usePetBridge } from './hooks/use-pet-bridge'
 import { useQuickEntryBridge } from './hooks/use-quick-entry-bridge'
 import { useSessionTileDelegate } from './hooks/use-session-tile-delegate'
+import { useWorkspaceRouteSync } from './hooks/use-workspace-route-sync'
 import { McpInstallDeepLinkDialog } from './mcp-install-deeplink-dialog'
 import { useTitlebarToolContributions } from './panes'
 import { type AmbientGatewayRequest, createSessionRpcDispatcher } from './session-rpc-dispatcher'
@@ -366,13 +360,8 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     routedSessionIdRef.current = null
   }, [])
 
-  // Point the workspace at the route: the pane contribution re-registers
-  // headerVeto from $workspaceIsPage (so the main zone's tab bar stands down
-  // on pages), and a page route fronts the pane so it can't stay stuck behind
-  // a focused session tile.
-  useEffect(() => {
-    syncWorkspaceRoute(location.pathname)
-  }, [location.pathname])
+  // A page route opens as its own tab; the router goes back to the chat.
+  useWorkspaceRouteSync()
 
   const {
     agentsOpen,
