@@ -4,10 +4,14 @@
  * (Capabilities / Messaging / Artifacts) render their view; plugin pages render
  * their `ROUTES_AREA` contribution. Lifecycle mirrors session tiles:
  * `openRouteTile(path)` -> `watchRouteTiles` registers a pane docked beside
- * main -> tree adoption lands it on the chosen edge; closing removes it.
+ * main (or as a tab in main's zone) -> tree adoption lands it; closing removes
+ * it. Every page opens this way (`openWorkspacePage`), so a page never
+ * replaces the session in the main tab.
  */
 
-import { lazy, type ReactNode, Suspense } from 'react'
+import { useStore } from '@nanostores/react'
+import { lazy, type ReactNode, Suspense, useMemo } from 'react'
+import { Route, Routes, useInRouterContext } from 'react-router'
 
 import { ContribBoundary, ContribRender } from '@/contrib/react/boundary'
 import { useContributions } from '@/contrib/react/use-contributions'
@@ -54,7 +58,39 @@ function routeTitle(path: string): string {
   return contributedRoutes().find(r => r.path === path)?.title ?? humanizePath(path)
 }
 
+/** Render a page against the TILE's location (`path` + its own query), not
+ *  the app router's, which stays on the session: `useLocation` / route params
+ *  inside the page read the tile. A page writing its URL state navigates the
+ *  app router to `path?…`; the wiring turns that back into this tile's query
+ *  (see `syncWorkspaceRoute`). */
+function TileLocation({ children, path }: { children: ReactNode; path: string }) {
+  const search = useStore($routeTiles).find(t => t.path === path)?.search ?? ''
+  const location = useMemo(
+    () => ({ hash: '', key: `tile:${path}`, pathname: path, search, state: null }),
+    [path, search]
+  )
+
+  // Outside a router (an isolated mount) there is no location to override.
+  if (!useInRouterContext()) {
+    return children
+  }
+
+  return (
+    <Routes location={location}>
+      <Route element={children} path="*" />
+    </Routes>
+  )
+}
+
 export function RouteTilePane({ path }: { path: string }) {
+  return (
+    <TileLocation path={path}>
+      <RouteTileBody path={path} />
+    </TileLocation>
+  )
+}
+
+function RouteTileBody({ path }: { path: string }) {
   const builtin = BUILTIN_PAGES[path]
 
   // Subscribe so a plugin page tile appears the moment its route registers.

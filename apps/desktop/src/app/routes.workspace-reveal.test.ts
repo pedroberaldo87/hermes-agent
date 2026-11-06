@@ -1,18 +1,19 @@
 /**
- * A full page (Capabilities/Messaging/Artifacts/a contributed route) renders
- * INSIDE the `workspace` pane, so navigating to one has to front that pane —
- * otherwise a main zone parked on a session tile keeps the tile on screen and
- * the click looks dead until the app restarts (#72602).
+ * A full page (Capabilities/Messaging/Artifacts/a contributed route) opens as
+ * its own tab, which every door has to FRONT — otherwise a main zone parked on
+ * a session tile keeps the tile on screen and the click looks dead (#72602).
  *
- * Two layers, both covered here: `syncWorkspaceRoute` (the router location,
- * every entry point) and `navigateToWorkspacePage` (the re-click, where the
- * location doesn't change).
+ * Three doors, all covered here: `syncWorkspaceRoute` (the router location,
+ * every entry point), `navigateToWorkspacePage` (sidebar/keybinds/palette, and
+ * the re-click, where the location doesn't change) and `host.navigate`.
+ * page-tabs.test.tsx covers the tab itself on a real layout tree.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { registry } from '@/contrib/registry'
 import { host } from '@/sdk'
+import { $routeTiles, closeRouteTile, routeTilePaneId } from '@/store/route-tiles'
 
 import {
   $workspaceIsPage,
@@ -49,9 +50,9 @@ function contributeRoute(): () => void {
   })
 }
 
-/** Did the workspace pane get fronted? Both calls, or the tab stays put. */
-const fronted = () =>
-  vi.mocked(revealTreePane).mock.calls.some(([pane]) => pane === 'workspace') &&
+/** Did the page's tab get fronted? Both calls, or the tab stays put. */
+const fronted = (path: string) =>
+  vi.mocked(revealTreePane).mock.calls.some(([pane]) => pane === routeTilePaneId(path)) &&
   vi.mocked(noteActiveTreeGroup).mock.calls.some(([group]) => group === null)
 
 beforeEach(() => {
@@ -62,6 +63,10 @@ beforeEach(() => {
 
 afterEach(() => {
   $workspaceIsPage.set(false)
+
+  for (const tile of $routeTiles.get()) {
+    closeRouteTile(tile.path)
+  }
 })
 
 describe('routePathname', () => {
@@ -95,29 +100,29 @@ describe('classification of targets carrying a query', () => {
 })
 
 describe('syncWorkspaceRoute', () => {
-  it('publishes and fronts on a page route', () => {
-    syncWorkspaceRoute(CAPABILITIES_ROUTE)
+  it('fronts the page tab and bounces the router to the chat', () => {
+    syncWorkspaceRoute(sessionRoute('sess-a'))
 
-    expect($workspaceIsPage.get()).toBe(true)
-    expect(fronted()).toBe(true)
+    expect(syncWorkspaceRoute(CAPABILITIES_ROUTE)).toBe(sessionRoute('sess-a'))
+    expect($workspaceIsPage.get()).toBe(false)
+    expect(fronted(CAPABILITIES_ROUTE)).toBe(true)
   })
 
-  it('fronts on a page route reached with a query', () => {
-    syncWorkspaceRoute(`${CAPABILITIES_ROUTE}?tab=connectors`)
+  it('carries the query into the tab', () => {
+    syncWorkspaceRoute(CAPABILITIES_ROUTE, '?tab=connectors')
 
-    expect($workspaceIsPage.get()).toBe(true)
-    expect(fronted()).toBe(true)
+    expect(fronted(CAPABILITIES_ROUTE)).toBe(true)
+    expect($routeTiles.get()).toEqual([{ dir: 'center', path: CAPABILITIES_ROUTE, search: '?tab=connectors' }])
   })
 
-  it('fronts when moving between two pages — the atom never changes, the tab must', () => {
+  it('fronts when moving between two pages', () => {
     syncWorkspaceRoute(ARTIFACTS_ROUTE)
     vi.mocked(revealTreePane).mockClear()
     vi.mocked(noteActiveTreeGroup).mockClear()
 
     syncWorkspaceRoute(MESSAGING_ROUTE)
 
-    expect($workspaceIsPage.get()).toBe(true)
-    expect(fronted()).toBe(true)
+    expect(fronted(MESSAGING_ROUTE)).toBe(true)
   })
 
   it('fronts on a contributed page route', () => {
@@ -127,7 +132,7 @@ describe('syncWorkspaceRoute', () => {
       syncWorkspaceRoute(CONTRIBUTED_ROUTE)
 
       expect(appViewForPath(CONTRIBUTED_ROUTE)).toBe('extension')
-      expect(fronted()).toBe(true)
+      expect(fronted(CONTRIBUTED_ROUTE)).toBe(true)
     } finally {
       dispose()
     }
@@ -138,22 +143,22 @@ describe('syncWorkspaceRoute', () => {
     ['the new-chat route', NEW_CHAT_ROUTE],
     ['an overlay', SETTINGS_ROUTE],
     ['an overlay with a query', `${SETTINGS_ROUTE}?tab=keys`]
-  ])('leaves the tab alone on %s', (_label, to) => {
-    syncWorkspaceRoute(to)
-
-    expect($workspaceIsPage.get()).toBe(false)
+  ])('leaves the tabs alone on %s', (_label, to) => {
+    expect(syncWorkspaceRoute(to)).toBeNull()
     expect(revealTreePane).not.toHaveBeenCalled()
   })
 })
 
 describe('navigateToWorkspacePage', () => {
-  it('navigates and fronts, so a re-click on the page you are already on still shows it', () => {
+  it('fronts the page tab without moving the router, so a re-click still shows it', () => {
     const navigate = vi.fn()
 
     navigateToWorkspacePage(navigate, CAPABILITIES_ROUTE)
+    navigateToWorkspacePage(navigate, CAPABILITIES_ROUTE)
 
-    expect(navigate).toHaveBeenCalledWith(CAPABILITIES_ROUTE, undefined)
-    expect(fronted()).toBe(true)
+    expect(navigate).not.toHaveBeenCalled()
+    expect(fronted(CAPABILITIES_ROUTE)).toBe(true)
+    expect($routeTiles.get()).toHaveLength(1)
   })
 
   it('navigates without fronting for chat and overlay targets', () => {
@@ -169,29 +174,28 @@ describe('navigateToWorkspacePage', () => {
 
 /**
  * `host.navigate` is the only nav door a plugin has (Kanban's ⌘K row, statusbar
- * count, ⌘⌥N). It writes the hash, which the router follows on a CHANGE — but
- * re-issuing the current route fires nothing, so it must reveal imperatively
- * like the sidebar does.
+ * count, ⌘⌥N). A page opens (or fronts) its tab without touching the hash.
  */
 describe('host.navigate', () => {
-  it('fronts the workspace pane even when already on the contributed page', () => {
+  it('fronts the contributed page tab, even when it is already open', () => {
     const dispose = contributeRoute()
 
     try {
-      window.location.hash = `#${CONTRIBUTED_ROUTE}`
+      window.location.hash = `#${sessionRoute('sess-a')}`
+      host.navigate(CONTRIBUTED_ROUTE)
       vi.mocked(revealTreePane).mockClear()
       vi.mocked(noteActiveTreeGroup).mockClear()
 
       host.navigate(CONTRIBUTED_ROUTE)
 
-      expect(window.location.hash).toBe(`#${CONTRIBUTED_ROUTE}`)
-      expect(fronted()).toBe(true)
+      expect(window.location.hash).toBe(`#${sessionRoute('sess-a')}`)
+      expect(fronted(CONTRIBUTED_ROUTE)).toBe(true)
     } finally {
       dispose()
     }
   })
 
-  it('does not front the pane for a chat route', () => {
+  it('does not front anything for a chat route', () => {
     host.navigate(sessionRoute('sess-a'))
 
     expect(revealTreePane).not.toHaveBeenCalled()
