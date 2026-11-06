@@ -22,7 +22,7 @@ import {
   patchMainComposerAttachmentOccurrence,
   revokeDiscardedAttachmentPreviews
 } from '@/store/composer'
-import { serverOwnsComposerQueue } from '@/store/composer-queue'
+import { logQueuedSubmitFailure, serverOwnsComposerQueue } from '@/store/composer-queue'
 import { noteMessageSent } from '@/store/desktop-metrics'
 import { $hudMode } from '@/store/hud'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
@@ -60,17 +60,18 @@ import {
 import { registerRecoveredRuntime, singleFlightSessionResume, takeRecoveredRuntime } from './single-flight-resume'
 import { captureSubmissionDestination, destinationAfterCreate, sameAuthorityPublishedOwner } from './submission-destination'
 import {
-  acquireSubmitInFlight,
+  acquireSubmitLock,
   type GatewayRequest,
   inlineErrorMessage,
   isAdmittedSubmissionConflict,
   isForwardedReceipt,
   isProviderSetupError,
-  isSessionBusyError,
   isSessionNotFoundError,
   isTargetSessionBusy,
   isVoiceStoppedReceipt,
+  logQueuedReceiptMismatch,
   ownershipErrorSurface,
+  quietQueuedRefusal,
   refusalDroppedImages,
   releaseSubmitInFlight,
   SessionRecoveryAborted,
@@ -564,7 +565,7 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
       // session switch; this per-session lock makes that safe.
       const submitLockKey = targetStoredSessionId || sessionId || startingActiveSessionId || '__pending_new__'
 
-      if (!acquireSubmitInFlight(submitLockKey)) {
+      if (!acquireSubmitLock(submitLockKey, options?.fromQueue)) {
         return false
       }
 
@@ -713,7 +714,12 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
         )
       }
 
-      const abortForSessionSwitch = (optimisticSessionId: null | string): false => {
+      const abortForSessionSwitch = (optimisticSessionId: null | string, failed = true): false => {
+        if (failed && options?.fromQueue) {
+          // Null drift: the stored session could not be resumed or rebound.
+          logQueuedSubmitFailure('aborted', { drift: sessionDriftReason(), stored: targetStoredSessionId })
+        }
+
         dropOptimistic(optimisticSessionId)
         releaseBusy()
 
@@ -1250,6 +1256,7 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
                 (result?.session_id !== undefined && result.session_id !== receiptSessionId) ||
                 !['queued', 'started', 'terminal', 'unknown'].includes(result?.status ?? ''))
             ) {
+              logQueuedReceiptMismatch(options?.fromQueue, result)
               dropOptimistic(sessionId)
               releaseBusy()
 
@@ -1299,7 +1306,7 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
 
             // RT-37: forwarded to the gateway owner's FIFO; its queued-row card stands for the send.
             if (isForwardedReceipt(legacyAccepted, result)) {
-              abortForSessionSwitch(sessionId)
+              abortForSessionSwitch(sessionId, false)
             }
 
             const rowId = result?.user_row_id
@@ -1382,7 +1389,7 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
         // A queued drain that raced a not-yet-settled turn gets a transient
         // "session busy" (4009). Don't surface an error bubble/toast — the entry
         // stays queued and the composer's bounded auto-drain retries when idle.
-        if (options?.fromQueue && isSessionBusyError(err)) {
+        if (quietQueuedRefusal(err, options?.fromQueue)) {
           return false
         }
 
