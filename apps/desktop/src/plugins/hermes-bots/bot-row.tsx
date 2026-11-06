@@ -214,12 +214,29 @@ export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandl
     }
   }
 
+  // "New chat with this bot": a fresh side chat owned by this bot.
+  const startNewChat = () => {
+    saveSelectedRosterBot(bot)
+    setBotsWorkspaceOwner(botWorkspaceOwnerKey(bot), bot)
+    newBotChat(bot)
+  }
+
   // Rows and Active Now share the exact-owner open path; only that path may
   // activate a source and resolve the canonical Bot Chat. ⌘/⌃-click opens
   // the Bot Chat as a stacked tab beside the current one (same modifier the
   // Sessions rows honour) instead of replacing whatever main holds.
-  const open = (event?: { ctrlKey?: boolean; metaKey?: boolean }) =>
+  // ⇧-click is the menu's "New chat with this bot" and wins over ⌘/⌃.
+  const open = (event?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) => {
+    if (event?.shiftKey) {
+      // Shift-click would otherwise extend the page's text selection.
+      window.getSelection()?.removeAllRanges()
+      startNewChat()
+
+      return
+    }
+
     void openRosterBot(bot, { intent: event?.metaKey || event?.ctrlKey ? 'tab' : 'in-place' })
+  }
 
   // DRAG lives on the row button itself: it already takes pointer events, so
   // the click that opens the bot and the drag that files it are one element's
@@ -431,15 +448,7 @@ export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandl
           {b.bot.duplicate}
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem
-          onSelect={() => {
-            saveSelectedRosterBot(bot)
-            setBotsWorkspaceOwner(botWorkspaceOwnerKey(bot), bot)
-            newBotChat(bot)
-          }}
-        >
-          {b.bot.newChatWith}
-        </ContextMenuItem>
+        <ContextMenuItem onSelect={startNewChat}>{b.bot.newChatWith}</ContextMenuItem>
         {/* Click-to-latest (#93054): the freshest listed session — a cron run,
             a delegated job, a side thread — without moving the row click off
             the canonical Bot Chat. */}
