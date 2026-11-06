@@ -28,6 +28,7 @@ import { enOnboarding } from './en_onboarding'
 import { enPluginPreviewAccess } from './en_plugin_preview_access'
 import { enPluginUpdate } from './en_plugin_update'
 import { enPluginUpdateAll } from './en_plugin_update_all'
+import { enPluginsInstalledView } from './en_plugins_installed_view'
 import { enPreviewWeb } from './en_preview_web'
 import { enProjects } from './en_projects'
 import { enSandbox } from './en_sandbox'
@@ -2179,6 +2180,7 @@ export const en: Translations = {
       pinnedBadge: (sha: string) => `pinned @ ${sha}`,
       ...enPluginUpdate,
       ...enPluginUpdateAll,
+      ...enPluginsInstalledView,
       ...enPluginPreviewAccess,
       uninstall: 'Uninstall',
       uninstallTip: (name: string, profile: string) => `Uninstall ${name} from ${profile}`,

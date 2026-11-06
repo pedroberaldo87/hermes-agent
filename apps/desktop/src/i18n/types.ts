@@ -31,6 +31,7 @@ import type { NotificationSettingsTranslations } from './types_notifications'
 import type { OnboardingTranslations } from './types_onboarding'
 import type { PluginPreviewAccessTranslations } from './types_plugin_preview_access'
 import type { PluginUpdateAllTranslations, PluginUpdateTranslations } from './types_plugin_update'
+import type { PluginsInstalledViewTranslations } from './types_plugins_installed_view'
 import type { SidebarProjectsTranslations } from './types_projects'
 import type { RightSidebarTranslations } from './types_right_sidebar'
 import type { SandboxCopy } from './types_sandbox'
@@ -1928,6 +1929,7 @@ export interface Translations extends NoticeTranslations {
     tabPlugins: string
     plugins: PluginUpdateTranslations &
       PluginUpdateAllTranslations &
+      PluginsInstalledViewTranslations &
       PluginPreviewAccessTranslations & {
         agentTitle: string
         agentBlurb: string
