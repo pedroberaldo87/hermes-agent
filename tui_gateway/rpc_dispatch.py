@@ -43,10 +43,32 @@ def _handle_admitted_request(req: dict) -> dict | None:
         return _err(rid, 4064, str(exc.code))
     finally:
         _current_rpc_method.reset(token)
+    _log_turn_refusal(method, params, response)
     if contract is not None and isinstance(response, dict) and isinstance(response.get("result"), dict):
         _contracts.check_params_accepted(contract, params)
         _contracts.check_result(contract, response["result"])
     return response
+
+
+#: Turn-admission RPCs whose refusal a client may swallow: the desktop queue drain retries a
+#: refused send as a bare ``false`` and, after four tries, says only "Queued message not sent".
+_LOGGED_REFUSAL_METHODS = frozenset({"prompt.submit", "session.resume"})
+
+
+def _log_turn_refusal(method: str, params: dict, response) -> None:
+    """One INFO line per refused turn admission, so the reason outlives the client's retry.
+    Code, reason and session only: never the prompt text."""
+    if method not in _LOGGED_REFUSAL_METHODS or not isinstance(response, dict):
+        return
+    error = response.get("error")
+    if not isinstance(error, dict):
+        return
+    data = error.get("data")
+    logger.info(
+        "rpc refused: method=%s session=%s code=%s reason=%s queued=%s message=%.200s",
+        method, params.get("session_id"), error.get("code"),
+        data.get("reason") if isinstance(data, dict) else None,
+        bool(params.get("queued")), error.get("message"))
 
 
 def dispatch(req: dict, transport: Optional[Transport] = None) -> dict | None:

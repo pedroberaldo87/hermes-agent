@@ -7,6 +7,7 @@ import { resetBrowseState } from '@/store/composer-input-history'
 import {
   $parkedQueueSessions,
   $queuedPromptsBySession,
+  logQueuedSubmitFailure,
   MAX_AUTO_DRAIN_ATTEMPTS,
   noteQueuedPromptDrainFailure,
   type QueuedPromptEntry,
@@ -110,6 +111,13 @@ export function useBackgroundQueueDrain({
         // more rejections (and the exhaustion notice) against a session that
         // is exactly as dead as it was when the process exited (#98015).
         noteQueuedPromptDrainFailure(sessionKey, entry.id)
+        logQueuedSubmitFailure('attempt-failed', {
+          background: true,
+          key: sessionKey,
+          entry: entry.id,
+          attempt: failures,
+          max: MAX_AUTO_DRAIN_ATTEMPTS
+        })
 
         if (failures >= MAX_AUTO_DRAIN_ATTEMPTS) {
           // The session rejected every drain attempt. Discovery has settled
