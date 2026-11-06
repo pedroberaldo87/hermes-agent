@@ -6679,7 +6679,7 @@ describe('openNewSessionTile unlisted owner (#102792)', () => {
   })
 })
 describe('selectSidebarItem', () => {
-  it('fronts the workspace pane when navigating to a sidebar route (issue #72602)', async () => {
+  it('opens a sidebar page as its own tab and fronts it, leaving the router on the chat (issue #72602)', async () => {
     const navigate = vi.fn()
     const requestGateway = vi.fn(async () => ({}) as never)
     let handle: HarnessHandle | null = null
@@ -6696,9 +6696,9 @@ describe('selectSidebarItem', () => {
       })
     })
 
-    expect(navigate).toHaveBeenCalledWith('/capabilities', undefined)
+    expect(navigate).not.toHaveBeenCalled()
     expect(noteActiveTreeGroup).toHaveBeenCalledWith(null)
-    expect(revealTreePane).toHaveBeenCalledWith('workspace')
+    expect(revealTreePane).toHaveBeenCalledWith('route-tile:/capabilities')
   })
 })
 
