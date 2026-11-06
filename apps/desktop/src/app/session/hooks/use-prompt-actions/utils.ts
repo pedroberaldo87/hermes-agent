@@ -8,6 +8,7 @@ import { type CommandsCatalogLike, filterDesktopCommandsCatalog } from '@/lib/de
 import type { ErrorSurface } from '@/lib/error-surface'
 import { isProviderSetupErrorMessage } from '@/lib/provider-setup-errors'
 import type { ComposerAttachment } from '@/store/composer'
+import { logQueuedSubmitFailure } from '@/store/composer-queue'
 
 import { registerRecoveredRuntime, singleFlightSessionResume, takeRecoveredRuntime } from './single-flight-resume'
 import type { SubmissionDestination } from './submission-destination'
@@ -296,6 +297,41 @@ export function isDeepTruncateRefusal(error: unknown): boolean {
 export function isSessionBusyError(error: unknown): boolean {
   // The shared owner answers its typed reason (`session_busy`), the legacy sidecar prose.
   return /session[ _]busy/i.test(error instanceof Error ? error.message : String(error))
+}
+
+/** A queue drain's failed submit: logged with its code, and true when it is the transient
+ *  busy race the bounded auto-drain retries without a toast. */
+export function quietQueuedRefusal(error: unknown, fromQueue: boolean | undefined): boolean {
+  if (!fromQueue) {
+    return false
+  }
+
+  logQueuedSubmitFailure('submit-error', {
+    code: error instanceof JsonRpcGatewayError ? error.code : undefined,
+    message: (error instanceof Error ? error.message : String(error)).slice(0, 200)
+  })
+
+  return isSessionBusyError(error)
+}
+
+/** A queued send whose admission receipt names another submission or session. */
+export function logQueuedReceiptMismatch(fromQueue: boolean | undefined, receipt: { status?: unknown } | undefined): void {
+  if (fromQueue) {
+    logQueuedSubmitFailure('receipt-mismatch', { status: receipt?.status ?? null })
+  }
+}
+
+/** The per-session submit lock; a queued send it drops is logged (it reports only `false`). */
+export function acquireSubmitLock(key: string, fromQueue: boolean | undefined): boolean {
+  if (acquireSubmitInFlight(key)) {
+    return true
+  }
+
+  if (fromQueue) {
+    logQueuedSubmitFailure('submit-in-flight', { key })
+  }
+
+  return false
 }
 
 /** A busy refusal because another writer holds the compression lock (`field: 'compression'`). */
