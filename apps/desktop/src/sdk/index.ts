@@ -25,7 +25,7 @@ import { capabilityScoped, getApiRequestConnection } from '@/api/client'
 import { mutateSessionFenced } from '@/api/sessions'
 import { PRIMARY_SESSION_VIEW } from '@/app/chat/session-view'
 import { openSession, type OpenSessionIntent } from '@/app/open-session'
-import { syncWorkspaceRoute } from '@/app/routes'
+import { isWorkspacePageRoute, openWorkspacePage } from '@/app/routes'
 import type { ClientSessionState } from '@/app/types'
 import {
   $newSessionTabAction,
@@ -645,14 +645,15 @@ export const host = {
   navigate: (path: string) => {
     const to = path.startsWith('#') ? path.slice(1) : path
 
+    // A page opens (or fronts) its own tab and the router stays on the chat —
+    // the same door the sidebar and keybinds use (`navigateToWorkspacePage`).
+    if (isWorkspacePageRoute(to)) {
+      openWorkspacePage(to)
+
+      return
+    }
+
     window.location.hash = `#${to}`
-    // The router follows the hash and fronts the workspace pane on a route
-    // CHANGE (wiring's `syncWorkspaceRoute` effect). Re-issuing the current
-    // route — palette/statusbar/hotkey while already on the page with a tile
-    // focused — changes nothing, so no event fires and the page stays behind
-    // the tile. Reveal imperatively, the same way `navigateToWorkspacePage`
-    // does for the sidebar and keybinds.
-    syncWorkspaceRoute(to)
   },
 
   warmProfile,

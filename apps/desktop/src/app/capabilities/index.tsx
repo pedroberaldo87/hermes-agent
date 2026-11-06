@@ -170,7 +170,6 @@ export function CapabilitiesView({
     <PageSearchShell
       {...props}
       activeTab={mode}
-      closable={!embedded}
       onTabChange={id => setMode(id as CapabilityMode)}
       // Every tab renders the shared CapabilitySearch beside its own results.
       searchHidden
