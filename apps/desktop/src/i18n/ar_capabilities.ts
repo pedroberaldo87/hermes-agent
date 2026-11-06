@@ -1,5 +1,6 @@
 import { arPluginPreviewAccess } from './ar_plugin_preview_access'
 import { arPluginUpdateAll } from './ar_plugin_update_all'
+import { arPluginsInstalledView } from './ar_plugins_installed_view'
 import type { TranslationOverrides } from './define-locale'
 
 export const arCapabilities = {
@@ -18,6 +19,7 @@ export const arCapabilities = {
     plugins: {
       ...arPluginPreviewAccess,
       ...arPluginUpdateAll,
+      ...arPluginsInstalledView,
       pageBlurb: 'يمكن للإضافة توسيع هذا التطبيق أو الوكيل أو كليهما — ولكل جزء مفتاح تشغيل مستقل.',
       folderAccess: {
         title: 'الوصول إلى المجلدات',
