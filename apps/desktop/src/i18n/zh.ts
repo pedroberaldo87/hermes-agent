@@ -21,6 +21,7 @@ import { zhOnboarding } from './zh_onboarding'
 import { zhPluginPreviewAccess } from './zh_plugin_preview_access'
 import { zhPluginUpdate } from './zh_plugin_update'
 import { zhPluginUpdateAll } from './zh_plugin_update_all'
+import { zhPluginsInstalledView } from './zh_plugins_installed_view'
 import { zhPreviewWeb } from './zh_preview_web'
 import { zhProjects } from './zh_projects'
 import { zhSharedMetrics } from './zh_shared_metrics'
@@ -2116,6 +2117,7 @@ export const zhOverrides = {
       pinnedBadge: (sha: string) => `固定 @ ${sha}`,
       ...zhPluginUpdate,
       ...zhPluginUpdateAll,
+      ...zhPluginsInstalledView,
       uninstall: '卸载',
       uninstallTip: (name: string, profile: string) => `从 ${profile} 卸载 ${name}`,
       uninstallConfirmTitle: (name: string) => `卸载 ${name}？`,

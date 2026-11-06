@@ -28,7 +28,7 @@ function PluginsHarness({ query: initialQuery, ...props }: ComponentProps<typeof
 
   return (
     <PageSearchShell onSearchChange={setQuery} searchHidden searchPlaceholder="Search plugins" searchValue={query}>
-      <PluginsTab {...props} onQueryChange={setQuery} query={query} />
+      <PluginsTab initialView="discover" {...props} onQueryChange={setQuery} query={query} />
     </PageSearchShell>
   )
 }
