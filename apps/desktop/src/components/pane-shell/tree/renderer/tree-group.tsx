@@ -618,6 +618,7 @@ export function TreeGroup({
     }
 
     activateTreePane(node.id, paneId)
+    paneChrome(paneFor(paneId)).onTabActivate?.()
   }
 
   // A pane whose store owns Close keeps the gesture even when the pane itself

@@ -120,7 +120,7 @@ import { AppContextMenu } from '../context-menu/app-context-menu'
 import { HudShell } from '../hud/hud-shell'
 import { $terminalTakeover, setTerminalTakeover } from '../right-sidebar/store'
 import { terminalPaletteToggle } from '../right-sidebar/terminal/reveal-focus'
-import { $workspaceIsPage, WORKSPACE_PAGE_HEADER_AREA } from '../routes'
+import { $workspaceIsPage, leaveWorkspacePage, WORKSPACE_PAGE_HEADER_AREA } from '../routes'
 import { Butterbar } from '../shell/butterbar'
 import { TermsButterbar } from '../shell/terms-butterbar'
 
@@ -214,6 +214,9 @@ registry.registerMany([
       // Standing chrome: no close gestures at all — the tab is shown/hidden
       // (zone menu Show/Hide rows + the auto-registered ⌘K toggle below).
       hideOnly: true,
+      // A full page (Capabilities, Messaging…) hides the chat; the SESSIONS
+      // tab is where the user looks for the way back to it.
+      onTabActivate: () => void leaveWorkspacePage(),
       tabTitle: () => <LocalizedTabTitle select={t => t.sidebar.sessions} />,
       tabTitleText: () => translateNow('sidebar.sessions'),
       width: `${SIDEBAR_DEFAULT_WIDTH}px`,

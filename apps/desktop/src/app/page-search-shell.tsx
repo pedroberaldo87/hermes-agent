@@ -1,8 +1,16 @@
-import type { ReactNode } from 'react'
+import { useStore } from '@nanostores/react'
+import { type ReactNode, useContext } from 'react'
 
+import { Button } from '@/components/ui/button'
+import { Codicon } from '@/components/ui/codicon'
 import { SearchField } from '@/components/ui/search-field'
 import { ResponsiveTabs } from '@/components/ui/tab-dropdown'
+import { Tip } from '@/components/ui/tooltip'
+import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
+
+import { WorkspacePageHeaderHostContext } from './contrib/workspace-page-header'
+import { $workspaceIsPage, leaveWorkspacePage } from './routes'
 
 // Tabs are data, not nodes: the shell owns their presentation so every page
 // gets the same behavior — a centered TextTab row on wide viewports that
@@ -33,6 +41,36 @@ interface PageSearchShellProps extends React.ComponentProps<'section'> {
   /** Right-aligned control in the header's trailing cell (e.g. a refresh button)
    *  so mouse users get a visible affordance for the refresh hotkey. */
   searchTrailingAction?: ReactNode
+  /** Show a close button that returns to the last chat. Only takes effect
+   *  while the page fills the workspace pane: an embedded copy (a plugin
+   *  dialog) or a page in a route tile has no chat to return to. */
+  closable?: boolean
+}
+
+/** ✕ at the end of the page header: back to the chat this page replaced. */
+function PageCloseButton() {
+  const { t } = useI18n()
+  const hostedInWorkspace = useContext(WorkspacePageHeaderHostContext)
+  const isPage = useStore($workspaceIsPage)
+
+  if (!hostedInWorkspace || !isPage) {
+    return null
+  }
+
+  return (
+    <Tip label={t.common.close}>
+      <Button
+        aria-label={t.common.close}
+        className="text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground"
+        data-testid="page-close"
+        onClick={() => leaveWorkspacePage()}
+        size="icon-xs"
+        variant="ghost"
+      >
+        <Codicon name="close" />
+      </Button>
+    </Tip>
+  )
 }
 
 function ShellTabs({
@@ -70,6 +108,7 @@ export function PageSearchShell({
   searchHidden = false,
   tabsAlign = 'center',
   searchTrailingAction,
+  closable = false,
   ...props
 }: PageSearchShellProps) {
   const hasTabs = (tabs?.length ?? 0) > 0
@@ -95,7 +134,7 @@ export function PageSearchShell({
         (see app-shell.tsx), so window dragging still works here.
       */}
       <div className="shrink-0">
-        {(hasTabs || !searchHidden) && (
+        {(hasTabs || !searchHidden || closable) && (
           <div className={cn('grid items-center gap-3 px-3 pb-2 pt-[calc(var(--titlebar-height)+0.5rem)]', tabsAlign === 'start' ? 'grid-cols-[minmax(0,1fr)_auto_auto] px-6 pt-[calc(var(--titlebar-height)+1.5rem)]' : 'grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]')}>
             <div className={cn('flex min-w-0 items-center justify-start', tabsAlign === 'start' ? 'col-start-2 row-start-1 justify-end' : '', searchHidden && tabsAlign === 'start' && 'hidden')}>
               {!searchHidden && onSearchChange && (
@@ -115,7 +154,10 @@ export function PageSearchShell({
             ) : (
               <span />
             )}
-            <div className={cn('flex min-w-0 items-center justify-end', tabsAlign === 'start' && 'col-start-3 row-start-1')}>{searchTrailingAction}</div>
+            <div className={cn('flex min-w-0 items-center justify-end gap-1', tabsAlign === 'start' && 'col-start-3 row-start-1')}>
+              {searchTrailingAction}
+              {closable && <PageCloseButton />}
+            </div>
           </div>
         )}
         {filters ? <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 pb-2">{filters}</div> : null}

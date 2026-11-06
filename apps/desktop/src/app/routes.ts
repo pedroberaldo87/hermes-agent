@@ -264,6 +264,12 @@ export function isWorkspacePageRoute(to: string): boolean {
  *  (settings/…) don't count — the chat stays beneath them. */
 export const $workspaceIsPage = atom(false)
 
+/** The chat route the workspace showed last (a session, or `/` for a draft).
+ *  A full page replaces the chat in the workspace pane, and nothing else on
+ *  screen leads back to it: the sidebar's SESSIONS tab and the page's close
+ *  button use this to return there. Overlays never write it. */
+export const $lastChatRoute = atom<string>(NEW_CHAT_ROUTE)
+
 /** Page-owned controls (kanban's board switcher) projected into the workspace
  *  panel's tab-header space while `$workspaceIsPage` holds — the page's title
  *  row, not the native band. Distinct from `titleBar.*`, whose slots stay
@@ -297,7 +303,31 @@ export function syncWorkspaceRoute(pathname: string): void {
 
   if (isPage) {
     revealWorkspacePane()
+  } else if (appViewForPath(pathname) === 'chat') {
+    $lastChatRoute.set(routePathname(pathname))
   }
+}
+
+/**
+ * Leave the full page the workspace is showing and return to the last chat.
+ * No-op (returns false) when the workspace already shows a chat, so a click on
+ * the SESSIONS tab never re-navigates a session the user is reading.
+ */
+export function leaveWorkspacePage(navigate?: NavigateLike): boolean {
+  if (!$workspaceIsPage.get()) {
+    return false
+  }
+
+  const to = $lastChatRoute.get() || NEW_CHAT_ROUTE
+
+  if (navigate) {
+    navigate(to)
+  } else {
+    // Outside React (pane chrome): the HashRouter follows the hash.
+    window.location.hash = `#${to}`
+  }
+
+  return true
 }
 
 /**
