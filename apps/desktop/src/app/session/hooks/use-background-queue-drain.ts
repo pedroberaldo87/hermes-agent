@@ -7,6 +7,8 @@ import { resetBrowseState } from '@/store/composer-input-history'
 import {
   $parkedQueueSessions,
   $queuedPromptsBySession,
+  dropEmptyQueuedEntry,
+  isEmptyQueuedEntry,
   logQueuedSubmitFailure,
   logQueuedSubmitThrow,
   MAX_AUTO_DRAIN_ATTEMPTS,
@@ -16,6 +18,7 @@ import {
   removeQueuedPrompt,
   resolveQueuedPromptTransport,
   shouldAutoDrain,
+  takeQueuedFailureReason,
   withQueueDrainClaim
 } from '@/store/composer-queue'
 import { notify } from '@/store/notifications'
@@ -106,7 +109,11 @@ export function useBackgroundQueueDrain({
 
       drainingSessionIdsRef.current.add(sessionKey)
 
+      // A cause left over from an earlier send must not be blamed on this one.
+      takeQueuedFailureReason()
+
       const onFail = () => {
+        const reason = takeQueuedFailureReason()
         const failures = (drainFailuresRef.current.get(entry.id) ?? entry.drainFailures ?? 0) + 1
         drainFailuresRef.current.set(entry.id, failures)
         // Persist the budget with the queue: a restart must not replay four
@@ -168,7 +175,7 @@ export function useBackgroundQueueDrain({
             id: `composer-background-queue-stuck-${sessionKey}`,
             kind: 'info',
             title: t.composer.queueStuckTitle,
-            message: t.composer.queueStuckBody
+            message: reason ? t.composer.queueStuckBodyWithReason(reason) : t.composer.queueStuckBody
           })
 
           return
@@ -182,6 +189,12 @@ export function useBackgroundQueueDrain({
 
         // Server-owned rows are already admitted to the gateway FIFO.
         if (!liveEntry || liveEntry.serverStatus) {
+          return true
+        }
+
+        if (isEmptyQueuedEntry(liveEntry)) {
+          dropEmptyQueuedEntry(sessionKey, liveEntry.id, t.composer)
+
           return true
         }
 
@@ -287,6 +300,14 @@ export function useBackgroundQueueDrain({
 
       const entry = entries.find(candidate => !candidate.serverStatus)
 
+      // An entry with nothing to send goes regardless of its spent budget: it was persisted as
+      // exhausted by builds that retried it, and would otherwise sit at the head forever.
+      if (entry && isEmptyQueuedEntry(entry)) {
+        dropEmptyQueuedEntry(sessionKey, entry.id, t.composer)
+
+        continue
+      }
+
       if (!entry || (drainFailuresRef.current.get(entry.id) ?? entry.drainFailures ?? 0) >= MAX_AUTO_DRAIN_ATTEMPTS) {
         continue
       }
@@ -301,6 +322,7 @@ export function useBackgroundQueueDrain({
     retryTick,
     selectedStoredSessionId,
     sessionsLoading,
+    t.composer,
     workingSessionIds
   ])
 }
