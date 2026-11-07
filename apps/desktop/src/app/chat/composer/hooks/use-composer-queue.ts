@@ -12,8 +12,10 @@ import {
   $parkedQueueSessions,
   $queuedPromptsBySession,
   clearQueuedPromptDrainFailures,
+  dropEmptyQueuedEntry,
   enqueueQueuedPrompt,
   getQueuedPrompts,
+  isEmptyQueuedEntry,
   isSteerableEntry,
   logQueuedSubmitFailure,
   logQueuedSubmitThrow,
@@ -26,6 +28,7 @@ import {
   resolveQueuedPromptTransport,
   serverOwnsComposerQueue,
   shouldAutoDrain,
+  takeQueuedFailureReason,
   unparkQueuedPrompts,
   updateQueuedPrompt,
   withQueueDrainClaim
@@ -247,12 +250,16 @@ export function useComposerQueue({
       return true
     }
 
-    const saved = updateQueuedPrompt(queueEdit.sessionKey, queueEdit.entryId, {
-      attachments: cloneAttachments(attachments),
-      text: frozen.text,
-      displayText: frozen.displayText ?? null,
-      frozenTransport: frozen.frozenTransport ?? null
-    })
+    // Same rule as an explicit Save: an empty composer never overwrites the entry (an entry with
+    // no text and no attachment can never send).
+    const saved =
+      (frozen.text.trim() || attachments.length > 0) &&
+      updateQueuedPrompt(queueEdit.sessionKey, queueEdit.entryId, {
+        attachments: cloneAttachments(attachments),
+        text: frozen.text,
+        displayText: frozen.displayText ?? null,
+        frozenTransport: frozen.frozenTransport ?? null
+      })
 
     const next = queuedPrompts[target]
 
@@ -499,6 +506,7 @@ export function useComposerQueue({
       const drainRuntimeSessionId = sessionId ?? null
 
       drainingQueueRef.current = true
+      let droppedEmpty = false
 
       try {
         return await withQueueDrainClaim(drainQueueSessionKey, async queue => {
@@ -506,6 +514,15 @@ export function useComposerQueue({
           const entry = pickEntry(queue.filter(candidate => !candidate.serverStatus))
 
           if (!entry) {
+            return null
+          }
+
+          if (isEmptyQueuedEntry(entry)) {
+            dropEmptyQueuedEntry(drainQueueSessionKey, entry.id, t.composer)
+            // The removal re-rendered while this drain held the lock: wake the auto-drain for the
+            // entry behind it once the lock is released.
+            droppedEmpty = true
+
             return null
           }
 
@@ -556,6 +573,10 @@ export function useComposerQueue({
         })
       } finally {
         drainingQueueRef.current = false
+
+        if (droppedEmpty) {
+          setDrainRetryTick(tick => tick + 1)
+        }
       }
     },
     [activeQueueSessionKey, onSubmit, sessionId, t.composer]
@@ -708,11 +729,15 @@ export function useComposerQueue({
     let cancelled = false
     let retryTimer: ReturnType<typeof setTimeout> | undefined
 
+    // A cause left over from an earlier send must not be blamed on this one.
+    takeQueuedFailureReason()
+
     const onFail = () => {
       if (cancelled) {
         return
       }
 
+      const reason = takeQueuedFailureReason()
       const fails = (drainFailuresRef.current.get(entry.id) ?? 0) + 1
       drainFailuresRef.current.set(entry.id, fails)
       logQueuedSubmitFailure('attempt-failed', {
@@ -727,7 +752,7 @@ export function useComposerQueue({
           id: 'composer-queue-stuck',
           kind: 'error',
           title: t.composer.queueStuckTitle,
-          message: t.composer.queueStuckBody
+          message: reason ? t.composer.queueStuckBodyWithReason(reason) : t.composer.queueStuckBody
         })
       } else {
         retryTimer = setTimeout(() => setDrainRetryTick(tick => tick + 1), 750 * fails)

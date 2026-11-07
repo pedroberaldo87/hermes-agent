@@ -3014,6 +3014,9 @@ export interface Translations extends NoticeTranslations {
     queueResumeTip: string
     queueStuckTitle: string
     queueStuckBody: string
+    queueStuckBodyWithReason: (reason: string) => string
+    queueEmptyDroppedTitle: string
+    queueEmptyDroppedBody: string
     queueDroppedTitle: string
     queueDroppedBody: string
     terminalSelectionMissingTitle: string

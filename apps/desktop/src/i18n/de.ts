@@ -3959,6 +3959,11 @@ export const deOverrides = {
     queueStuckTitle: 'Eingereihte Nachricht nicht gesendet',
     queueStuckBody:
       'Ein eingereihter Turn konnte nicht gesendet werden. Er ist noch in der Warteschlange — versuchen Sie, ihn erneut zu senden.',
+    queueStuckBodyWithReason: reason =>
+      `Eine eingereihte Eingabe ließ sich wiederholt nicht senden: ${reason}. Sie bleibt in der Warteschlange — korrigiere oder entferne sie.`,
+    queueEmptyDroppedTitle: 'Leere eingereihte Nachricht entfernt',
+    queueEmptyDroppedBody:
+      'Eine eingereihte Nachricht hatte weder Text noch Anhang und hätte nie gesendet werden können.',
     queueDroppedTitle: 'Eingereihte Eingabe verworfen',
     queueDroppedBody:
       'Dieser Hintergrund-Eintrag wurde verworfen, da seine Sitzung nach wiederholten Versuchen nicht fortgesetzt werden konnte. Die übrige Warteschlange ist unverändert.',

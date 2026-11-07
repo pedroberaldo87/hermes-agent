@@ -3947,6 +3947,10 @@ export const esOverrides = {
       'El gateway se reinició a mitad del turno y no puede terminarlo. Descártalo para que se ejecuten los turnos en cola que esperan detrás.',
     queueStuckTitle: 'Mensaje en cola no enviado',
     queueStuckBody: 'Un turno en cola no llegó a enviarse. Sigue en la cola; vuelve a intentarlo.',
+    queueStuckBodyWithReason: reason =>
+      `Un turno en cola no llegó a enviarse: ${reason}. Sigue en la cola; corrígelo o quítalo.`,
+    queueEmptyDroppedTitle: 'Mensaje en cola vacío eliminado',
+    queueEmptyDroppedBody: 'Un mensaje en cola no tenía texto ni adjuntos, así que nunca podría enviarse.',
     queueDroppedTitle: 'Entrada en cola descartada',
     queueDroppedBody:
       'Se descartó esta entrada en segundo plano porque su sesión no se pudo reanudar tras varios intentos. El resto de la cola no se ha visto afectado.',

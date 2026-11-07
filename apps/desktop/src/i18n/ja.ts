@@ -2475,6 +2475,10 @@ export const jaOverrides = {
     queueStuckTitle: 'キュー内のメッセージを送信できません',
     queueStuckBody:
       'キューに入れたターンの送信が繰り返し失敗しました。まだキューに残っています。もう一度送信してください。',
+    queueStuckBodyWithReason: reason =>
+      `キューのメッセージを送信できませんでした: ${reason}。キューに残っています — 修正するか削除してください。`,
+    queueEmptyDroppedTitle: '空のキューメッセージを削除しました',
+    queueEmptyDroppedBody: 'キューのメッセージにテキストも添付もなく、送信できませんでした。',
     queueDroppedTitle: 'キューのエントリを破棄しました',
     queueDroppedBody:
       'このバックグラウンドのエントリは、セッションを繰り返し再開できなかったため破棄されました。キューの他のエントリには影響しません。',
