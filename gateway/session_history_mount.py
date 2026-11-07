@@ -47,6 +47,21 @@ def mount_history(authority, actor, sid):
     return True
 
 
+def mount_busy_legacy(authority, actor, sid):
+    """Mount an old local CLI/TUI/Desktop row read-only for its owner while another live writer holds
+    it, so adoption must wait (gateway.session_local_migration.resume_local_target). False when the
+    row is not such a row, the actor may not read it, or this authority already serves it otherwise."""
+    from hermes_state_local_migration import LEGACY_LOCAL_SOURCES
+    row = authority.db.get_session(sid)
+    if (row is None or row['source'] not in LEGACY_LOCAL_SOURCES
+            or row.get('profile_name') not in (None, '', authority.db._own_profile_name() or 'default')
+            or not _reader(authority, actor, sid)):
+        return False
+    authority._require_admission_open()
+    from gateway.session_authority import LiveSession
+    return is_history_mount(authority.sessions.setdefault(sid, LiveSession(None, _ROUTE_PREFIX + sid)))
+
+
 def is_history_mount(live):
     return live.source is None and live.route.startswith(_ROUTE_PREFIX)
 

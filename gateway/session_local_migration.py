@@ -74,6 +74,21 @@ def resolve_local_target(authority, actor, sid):
     return adopt_legacy_session(authority, actor, row)
 
 
+def resume_local_target(authority, actor, sid):
+    """``resolve_local_target`` for an open (session.resume): a pre-authority row another live writer
+    holds (the old Desktop path's open tab, its running turn or compression) cannot be adopted yet, so
+    its owner reads it instead of getting no conversation at all. The first open after the holder lets
+    go adopts it in place (restore_local_session promotes the read-only mount)."""
+    try:
+        return resolve_local_target(authority, actor, sid)
+    except RuntimeStoreError as exc:
+        from gateway.session_history_mount import mount_busy_legacy
+        if exc.reason not in ('runtime_coordination_required', 'session_busy') \
+                or not mount_busy_legacy(authority, actor, sid):
+            raise
+        return SessionRef(authority.profile_id, sid)
+
+
 def legacy_launch_params(row):
     """``(create params, api_mode)`` a legacy row resumes on.
 
@@ -278,6 +293,7 @@ def adopt_legacy_session(authority, actor, row):
     from gateway.session_local_recovery import restore_local_session
     from hermes_state_local import commit_local_session
     from hermes_cli.active_sessions import active_session_liveness_guard, ActiveSessionRegistryError
+    from hermes_state_mutation_guards import MUTATION_GUARD_REFUSALS
 
     request_id = 'legacy:' + row['id']
     sid = row['id']
@@ -356,6 +372,7 @@ def adopt_legacy_session(authority, actor, row):
             if active:
                 raise RuntimeStoreError('runtime_coordination_required')
             commit_local_session(authority.db, epoch=authority.epoch, receipt=receipt)
-    except ActiveSessionRegistryError as exc:
+    except (ActiveSessionRegistryError, *MUTATION_GUARD_REFUSALS) as exc:
+        # A turn lease or compression lock on the row is the same live holder as a registry lease.
         raise RuntimeStoreError('runtime_coordination_required') from exc
     return restore_local_session(authority, sid)
