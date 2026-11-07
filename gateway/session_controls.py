@@ -679,7 +679,7 @@ class AuthorityConnection:
                 resolved_id = authority_persistence(self.authority).sessions.resolve_id(ref.session_id)
                 if resolved_id is not None:
                     ref = SessionRef(ref.profile_id, resolved_id)
-            from gateway.session_local_migration import adopts_client_history, resolve_local_target
+            from gateway.session_local_migration import adopts_client_history, resume_local_target
             from gateway.session_policy_refresh import refresh_settled
             from persistence.authority.vocabulary import LEGACY_LOCAL_SOURCES
             # Another viewer's refresh mid-cleanup has committed a policy it has not published yet.
@@ -691,7 +691,7 @@ class AuthorityConnection:
             # after list_sessions projects the tip (#139306).
             if row and (row.source in LEGACY_LOCAL_SOURCES | {Platform.LOCAL.value}
                         or adopts_client_history(self.authority, self.actor, row)):
-                ref = resolve_local_target(self.authority, self.actor, store.lineage.tip(ref.session_id))
+                ref = resume_local_target(self.authority, self.actor, store.lineage.tip(ref.session_id))
             elif row:
                 # A messaging compression continuation attaches to its lineage root, the session
                 # its lane's turns stream to; the reply names that root.
