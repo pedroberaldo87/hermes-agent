@@ -37,7 +37,8 @@ import {
 import { activeGateway } from '@/store/gateway'
 import { notify } from '@/store/notifications'
 import { isReplyPaused, useReplyPaused } from '@/store/paused-replies'
-import { $sessionsLoading } from '@/store/session'
+import { $selectedStoredSessionId, $sessions, $sessionsLoading } from '@/store/session'
+import { liveStoredSessionIdForQueueKey } from '@/store/session-queue-target'
 
 import { cloneAttachments, type QueueEditState } from '../composer-utils'
 import { replaceQueuedPrompt } from '../discard-lost-prompt'
@@ -84,7 +85,18 @@ export function freezeQueuedDraftText(
 // A new chat's queue (its fresh draft key: no session yet) drains as the chat's first message, which
 // creates the session; a stored chat's queue drains into that chat.
 const queueDrainTarget = (queueKey: string, runtimeSessionId: null | string) =>
-  isFreshDraftScope(queueKey) ? {} : { sessionId: runtimeSessionId, storedSessionId: queueKey }
+  isFreshDraftScope(queueKey)
+    ? {}
+    : {
+        sessionId: runtimeSessionId,
+        // Queue key = lineage root; the send targets the live tip so a compressed chat never resumes
+        // its frozen root (dead owner).
+        storedSessionId: liveStoredSessionIdForQueueKey(
+          queueKey,
+          $sessions.get(),
+          $selectedStoredSessionId.get()
+        )
+      }
 
 interface UseComposerQueueArgs {
   activeQueueSessionKey: string | null
@@ -468,7 +480,11 @@ export function useComposerQueue({
           ...(frozen.displayText ? { displayText: frozen.displayText } : {}),
           fromQueue: true,
           sessionId: sessionId ?? null,
-          storedSessionId: activeQueueSessionKey,
+          storedSessionId: liveStoredSessionIdForQueueKey(
+            activeQueueSessionKey,
+            $sessions.get(),
+            $selectedStoredSessionId.get()
+          ),
           ...(submissionId ? { submission_id: submissionId } : {})
         })
       )

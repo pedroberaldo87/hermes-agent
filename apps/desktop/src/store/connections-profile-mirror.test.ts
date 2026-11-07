@@ -15,6 +15,7 @@ const $connection = atom<null | {
   registryScoped?: boolean
 }>(null)
 
+vi.mock('@/store/session-queue-target', () => ({ pruneSessionOwnerHintsToConnections: vi.fn() }))
 vi.mock('@/store/session', () => ({
   $connection,
   $activeSessionId: atom(null),
