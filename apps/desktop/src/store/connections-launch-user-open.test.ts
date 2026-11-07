@@ -35,6 +35,7 @@ const ensureGatewayAgent = vi.fn(
 
 const openGatewayAgent = vi.fn(async (_connectionId: string, _profile: string): Promise<void> => undefined)
 
+vi.mock('@/store/session-queue-target', () => ({ pruneSessionOwnerHintsToConnections: vi.fn() }))
 vi.mock('@/store/session', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   $connection,

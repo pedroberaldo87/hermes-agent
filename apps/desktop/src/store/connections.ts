@@ -41,6 +41,7 @@ import {
   setSelectedStoredSessionId
 } from '@/store/session'
 import { currentUserSessionOpen, LAUNCH_USER_SESSION_OPEN } from '@/store/session-open-intent'
+import { pruneSessionOwnerHintsToConnections } from '@/store/session-queue-target'
 import { reloadOpenStarmapGraph, resetStarmapGraph } from '@/store/starmap'
 import { isPeerInstanceWindow, windowProfileOverride } from '@/store/windows'
 
@@ -276,6 +277,9 @@ export async function refreshConnectionsRegistry(): Promise<DesktopConnectionsRe
   )
 
   setConnectionsRegistry(registry)
+  // A source removed while the app was closed never fired the live removal
+  // event, so its owner hints would pin sessions to a dead route forever.
+  pruneSessionOwnerHintsToConnections((registry?.connections ?? []).map(connection => connection.id))
 
   return registry
 }

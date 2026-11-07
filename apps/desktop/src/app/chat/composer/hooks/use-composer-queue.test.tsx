@@ -18,7 +18,7 @@ import {
 import { $notifications, clearNotifications } from '@/store/notifications'
 import { endReplyPause, markReplyPaused } from '@/store/paused-replies'
 import { reconcilePendingSubmissions } from '@/store/pending-submissions'
-import { $connection, $sessions, setSessionsLoading } from '@/store/session'
+import { $connection, $sessions, setSelectedStoredSessionId, setSessions, setSessionsLoading } from '@/store/session'
 import type { SessionInfo } from '@/types/hermes'
 
 import type { QueueEditState } from '../composer-utils'
@@ -106,6 +106,8 @@ describe('useComposerQueue park integration', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+    setSessions([])
+    setSelectedStoredSessionId(null)
     $queuedPromptsBySession.set({})
     $parkedQueueSessions.set({})
     resetFrozenQueuedTransportsForTests()
@@ -231,6 +233,32 @@ describe('useComposerQueue park integration', () => {
     const { onSubmit } = renderQueueHook()
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    expect(getQueuedPrompts(SESSION_KEY)).toHaveLength(0)
+  })
+
+  it('drains a root-keyed queue into the selected compression tip (manual send)', async () => {
+    // SESSION_KEY is the lineage root; the chat on screen is its live tip.
+    setSessions([
+      {
+        id: 'tip-queue-hook',
+        _lineage_root_id: SESSION_KEY,
+        _lineage_ids: [SESSION_KEY, 'tip-queue-hook']
+      } as SessionInfo
+    ])
+    setSelectedStoredSessionId('tip-queue-hook')
+    enqueueQueuedPrompt(SESSION_KEY, { attachments: [], text: 'pronto' })
+    parkQueuedPrompts(SESSION_KEY)
+
+    const { hook, onSubmit } = renderQueueHook()
+
+    await act(async () => {
+      await hook.result.current.drainNextQueued()
+    })
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      'pronto',
+      expect.objectContaining({ fromQueue: true, storedSessionId: 'tip-queue-hook' })
+    )
     expect(getQueuedPrompts(SESSION_KEY)).toHaveLength(0)
   })
 
