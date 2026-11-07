@@ -37,7 +37,6 @@ import { dropBrowserProfilePrefs, migrateBrowserProfilePrefs } from '@/lib/brows
 import { finalizeInterruptedMessages, sealOpenToolParts } from '@/lib/chat-messages'
 import { tileFocusStampOnFocusChange } from '@/lib/session-timer-since'
 import { stableArray } from '@/lib/stable-array'
-import { readJson, writeJson } from '@/lib/storage'
 import type { SessionInfo } from '@/types/hermes'
 
 import { $botChatScopes, $botChatSessionIds, carryBotChatScope, rememberBotChatScope } from './bot-chat-scope'
