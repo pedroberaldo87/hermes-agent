@@ -3968,6 +3968,11 @@ export const frOverrides = {
     queueStuckTitle: "Message en file d'attente non envoyé",
     queueStuckBody:
       "Un tour en file d'attente a continué à échouer lors de l'envoi. Il est toujours en file d'attente — essayez de l'envoyer à nouveau.",
+    queueStuckBodyWithReason: reason =>
+      `Un message en file d'attente n'a pas pu être envoyé : ${reason}. Il reste dans la file — corrigez-le ou supprimez-le.`,
+    queueEmptyDroppedTitle: "Message vide retiré de la file d'attente",
+    queueEmptyDroppedBody:
+      "Un message en file d'attente n'avait ni texte ni pièce jointe : il n'aurait jamais pu être envoyé.",
     queueDroppedTitle: "Élément en file d'attente abandonné",
     queueDroppedBody:
       "Cette entrée d'arrière-plan a été abandonnée car sa session n'a pas pu être reprise après plusieurs tentatives. Le reste de la file d'attente est inchangé.",

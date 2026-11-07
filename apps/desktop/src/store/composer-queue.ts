@@ -8,6 +8,7 @@ import {
   revokeDiscardedAttachmentPreviews
 } from './composer'
 import { connectionWire } from './connection-wire'
+import { notify } from './notifications'
 import { $connection } from './session'
 import { knownOwnerForSession } from './session-states'
 
@@ -745,9 +746,48 @@ export function logQueuedSubmitThrow(where: string, error: unknown): void {
   })
 }
 
+/** True when a queued entry has nothing to send: no text and no attachment. Submit refuses it
+ *  on every attempt, so a drain must remove it rather than retry it forever. */
+export const isEmptyQueuedEntry = (entry: Pick<QueuedPromptEntry, 'attachments' | 'displayText' | 'text'>): boolean =>
+  !entry.text.trim() && !entry.displayText?.trim() && entry.attachments.length === 0
+
+/** Remove an entry that can never send, saying so (both drains). */
+export function dropEmptyQueuedEntry(
+  key: string,
+  id: string,
+  copy: { queueEmptyDroppedBody: string; queueEmptyDroppedTitle: string }
+): void {
+  removeQueuedPrompt(key, id)
+  logQueuedSubmitFailure('empty-dropped', { key, entry: id })
+  notify({ kind: 'info', title: copy.queueEmptyDroppedTitle, message: copy.queueEmptyDroppedBody })
+}
+
+const QUEUED_FAILURE_REASONS: Record<string, string> = {
+  aborted: 'the conversation could not be reopened',
+  'not-sendable': 'it has no text and no attachment',
+  'receipt-mismatch': 'the server acknowledged a different message',
+  'submit-in-flight': 'another send to this chat was still in progress'
+}
+
+let lastQueuedFailureReason: null | string = null
+
+/** The cause of the most recent refused queued send, cleared on read. A drain takes it before
+ *  each attempt (to drop a stale cause) and after a failed one, for the give-up notice. */
+export function takeQueuedFailureReason(): null | string {
+  const reason = lastQueuedFailureReason
+  lastQueuedFailureReason = null
+
+  return reason
+}
+
 /** One `[queue-drain]` line in desktop.log, which keeps only renderer `console.error`. A drain
  *  swallows most refusals (busy, drift, lock) as a bare `false`, so without it the "Queued
  *  message not sent" toast has no recorded cause. Callers never pass the queued text. */
 export function logQueuedSubmitFailure(stage: string, detail: Record<string, unknown> = {}): void {
   console.error(`[queue-drain] ${stage} ${JSON.stringify(detail)}`)
+
+  if (stage !== 'attempt-failed') {
+    const message = typeof detail.message === 'string' ? detail.message.trim() : ''
+    lastQueuedFailureReason = message || QUEUED_FAILURE_REASONS[stage] || stage
+  }
 }
