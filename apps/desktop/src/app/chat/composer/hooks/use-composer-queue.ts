@@ -16,6 +16,7 @@ import {
   getQueuedPrompts,
   isSteerableEntry,
   logQueuedSubmitFailure,
+  logQueuedSubmitThrow,
   MAX_AUTO_DRAIN_ATTEMPTS,
   migrateQueuedPrompts,
   promoteQueuedPrompt,
@@ -538,7 +539,11 @@ export function useComposerQueue({
               sessionId: drainRuntimeSessionId,
               storedSessionId: drainQueueSessionKey
             })
-          )
+          ).catch((error: unknown) => {
+            logQueuedSubmitThrow('foreground', error)
+
+            throw error
+          })
 
           if (accepted !== true) {
             return false

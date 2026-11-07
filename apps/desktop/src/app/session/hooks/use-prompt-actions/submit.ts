@@ -72,6 +72,7 @@ import {
   ownershipErrorSurface,
   quietQueuedRefusal,
   refusalDroppedImages,
+  refuseQueuedSend,
   releaseSubmitInFlight,
   SessionRecoveryAborted,
   type SubmitTextOptions,
@@ -328,7 +329,7 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
           !options?.fromQueue &&
           isTargetSessionBusy($sessionStates.get(), guardSessionId, busyRef.current))
       ) {
-        return false
+        return refuseQueuedSend(options?.fromQueue, 'not-sendable', { attachments: attachments.length })
       }
 
       // Typing barge-in: a new send silences any in-flight spoken reply.
