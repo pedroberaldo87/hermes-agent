@@ -8,6 +8,7 @@ import {
   $parkedQueueSessions,
   $queuedPromptsBySession,
   logQueuedSubmitFailure,
+  logQueuedSubmitThrow,
   MAX_AUTO_DRAIN_ATTEMPTS,
   noteQueuedPromptDrainFailure,
   type QueuedPromptEntry,
@@ -234,7 +235,10 @@ export function useBackgroundQueueDrain({
             onFail()
           }
         })
-        .catch(onFail)
+        .catch((error: unknown) => {
+          logQueuedSubmitThrow('background', error)
+          onFail()
+        })
         .finally(() => {
           drainingSessionIdsRef.current.delete(sessionKey)
         })

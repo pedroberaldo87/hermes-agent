@@ -16,6 +16,7 @@ import {
   getQueuedPrompts,
   isSteerableEntry,
   logQueuedSubmitFailure,
+  logQueuedSubmitThrow,
   MAX_AUTO_DRAIN_ATTEMPTS,
   migrateQueuedPrompts,
   promoteQueuedPrompt,
@@ -541,7 +542,11 @@ export function useComposerQueue({
                 $selectedStoredSessionId.get()
               )
             })
-          )
+          ).catch((error: unknown) => {
+            logQueuedSubmitThrow('foreground', error)
+
+            throw error
+          })
 
           if (accepted !== true) {
             return false

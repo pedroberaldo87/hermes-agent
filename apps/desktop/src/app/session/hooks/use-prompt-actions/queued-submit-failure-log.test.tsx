@@ -174,3 +174,22 @@ it('formats one parseable line', () => {
   logQueuedSubmitFailure('attempt-failed', { attempt: 2, max: 4 })
   expect(errors).toHaveBeenCalledWith('[queue-drain] attempt-failed {"attempt":2,"max":4}')
 })
+
+it('logs a queued send refused before any request (nothing to send)', async () => {
+  const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+  const hook = mount(refused)
+  let ok: boolean | undefined
+
+  await act(async () => {
+    ok = await hook.result.current.submit('   ', {
+      attachments: [],
+      fromQueue: true,
+      sessionId: RUNTIME,
+      storedSessionId: STORED,
+      submission_id: 'sub-empty'
+    })
+  })
+
+  expect(ok).toBe(false)
+  expect(queueLines(errors)).toEqual(['[queue-drain] not-sendable {"attachments":0}'])
+})
