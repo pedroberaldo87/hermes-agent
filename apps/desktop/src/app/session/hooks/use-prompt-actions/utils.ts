@@ -314,6 +314,19 @@ export function quietQueuedRefusal(error: unknown, fromQueue: boolean | undefine
   return isSessionBusyError(error)
 }
 
+/** A queued send refused before any request: logged (it reports only `false`). */
+export function refuseQueuedSend(
+  fromQueue: boolean | undefined,
+  stage: string,
+  detail: Record<string, unknown>
+): false {
+  if (fromQueue) {
+    logQueuedSubmitFailure(stage, detail)
+  }
+
+  return false
+}
+
 /** A queued send whose admission receipt names another submission or session. */
 export function logQueuedReceiptMismatch(fromQueue: boolean | undefined, receipt: { status?: unknown } | undefined): void {
   if (fromQueue) {
