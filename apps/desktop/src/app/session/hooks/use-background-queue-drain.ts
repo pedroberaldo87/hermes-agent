@@ -25,6 +25,7 @@ import {
   $sessionsLoading,
   getSessionOwnerHints,
   idsShareLineage,
+  liveStoredSessionIdForQueueKey,
   sessionMatchesStoredId
 } from '@/store/session'
 import { $workingSessionIds } from '@/store/session-states'
@@ -196,7 +197,15 @@ export function useBackgroundQueueDrain({
           return true
         }
 
-        const runtimeSessionId = runtimeIdByStoredSessionIdRef.current.get(sessionKey) ?? null
+        // The queue key is the lineage root; send to the conversation's live
+        // tip. The frozen root's owner hint can name a removed connection and
+        // its resume then fails on every attempt (stuck queue, dead send).
+        const liveStoredSessionId = liveStoredSessionIdForQueueKey(sessionKey, $sessions.get())
+
+        const runtimeSessionId =
+          runtimeIdByStoredSessionIdRef.current.get(liveStoredSessionId) ??
+          runtimeIdByStoredSessionIdRef.current.get(sessionKey) ??
+          null
 
         const accepted = await Promise.resolve(
           submitTextRef.current(resolved.transportText, {
@@ -205,7 +214,7 @@ export function useBackgroundQueueDrain({
             fromQueue: true,
             submission_id: queuedSubmissionId(liveEntry),
             sessionId: runtimeSessionId,
-            storedSessionId: sessionKey
+            storedSessionId: liveStoredSessionId
           })
         )
 

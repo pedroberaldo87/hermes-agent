@@ -37,6 +37,7 @@ import {
   $activeSessionId,
   $connection,
   $selectedStoredSessionId,
+  pruneSessionOwnerHintsToConnections,
   setActiveSessionId,
   setSelectedStoredSessionId
 } from '@/store/session'
@@ -276,6 +277,9 @@ export async function refreshConnectionsRegistry(): Promise<DesktopConnectionsRe
   )
 
   setConnectionsRegistry(registry)
+  // A source removed while the app was closed never fired the live removal
+  // event, so its owner hints would pin sessions to a dead route forever.
+  pruneSessionOwnerHintsToConnections((registry?.connections ?? []).map(connection => connection.id))
 
   return registry
 }

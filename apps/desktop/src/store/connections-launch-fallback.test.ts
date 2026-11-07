@@ -33,6 +33,7 @@ const openGatewayAgent = vi.fn(async (_connectionId: string, _profile: string): 
 
 vi.mock('@/store/session', () => ({
   $connection,
+  pruneSessionOwnerHintsToConnections: vi.fn(),
   $activeSessionId: atom(null),
   $selectedStoredSessionId: atom(null),
   setActiveSessionId: vi.fn(),

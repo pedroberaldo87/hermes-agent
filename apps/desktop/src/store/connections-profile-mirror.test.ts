@@ -17,6 +17,7 @@ const $connection = atom<null | {
 
 vi.mock('@/store/session', () => ({
   $connection,
+  pruneSessionOwnerHintsToConnections: vi.fn(),
   $activeSessionId: atom(null),
   $selectedStoredSessionId: atom(null),
   setActiveSessionId: vi.fn(),

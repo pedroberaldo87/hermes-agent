@@ -31,7 +31,7 @@ import {
 } from '@/store/composer-queue'
 import { activeGateway } from '@/store/gateway'
 import { notify } from '@/store/notifications'
-import { $sessionsLoading } from '@/store/session'
+import { $selectedStoredSessionId, $sessions, $sessionsLoading, liveStoredSessionIdForQueueKey } from '@/store/session'
 
 import { cloneAttachments, type QueueEditState } from '../composer-utils'
 import { replaceQueuedPrompt } from '../discard-lost-prompt'
@@ -444,7 +444,11 @@ export function useComposerQueue({
           ...(frozen.displayText ? { displayText: frozen.displayText } : {}),
           fromQueue: true,
           sessionId: sessionId ?? null,
-          storedSessionId: activeQueueSessionKey,
+          storedSessionId: liveStoredSessionIdForQueueKey(
+            activeQueueSessionKey,
+            $sessions.get(),
+            $selectedStoredSessionId.get()
+          ),
           ...(submissionId ? { submission_id: submissionId } : {})
         })
       )
@@ -529,7 +533,13 @@ export function useComposerQueue({
               fromQueue: true,
               submission_id: queuedSubmissionId(entry),
               sessionId: drainRuntimeSessionId,
-              storedSessionId: drainQueueSessionKey
+              // Queue key = lineage root; the send targets the live tip so a
+              // compressed chat never resumes its frozen root (dead owner).
+              storedSessionId: liveStoredSessionIdForQueueKey(
+                drainQueueSessionKey,
+                $sessions.get(),
+                $selectedStoredSessionId.get()
+              )
             })
           )
 

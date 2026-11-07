@@ -48,11 +48,13 @@ const requestFreshSession = vi.fn()
 const exitProjectScope = vi.fn()
 const isLegacyNewChatProfile = vi.fn((_profile: string) => false)
 const pinLegacyNewChatProfile = vi.fn()
+const pruneSessionOwnerHintsToConnections = vi.fn()
 
 vi.mock('@/store/session', () => ({
   $connection,
   $activeSessionId,
   $selectedStoredSessionId: atom(null),
+  pruneSessionOwnerHintsToConnections,
   setActiveSessionId: (id: null | string) => $activeSessionId.set(id),
   setSelectedStoredSessionId: vi.fn()
 }))
@@ -180,6 +182,14 @@ describe('connection registry cache', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('prunes owner hints for sources a fresh registry snapshot no longer lists', async () => {
+    pruneSessionOwnerHintsToConnections.mockClear()
+
+    await refreshConnectionsRegistry()
+
+    expect(pruneSessionOwnerHintsToConnections).toHaveBeenCalledWith(['local', 'homelab', 'work-vps'])
   })
 
   it('restores the last-used source once when that launch mode is enabled', async () => {
