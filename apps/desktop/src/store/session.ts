@@ -1334,6 +1334,11 @@ export function forgetSessionOwnerHintsForConnection(connectionId: string): void
   }
 }
 
+/** The connection id of every persisted owner hint (one entry per hint). */
+export function sessionOwnerHintConnectionIds(): string[] {
+  return [...sessionOwnerHints.values()].map(entry => entry.route.connectionId)
+}
+
 /** Drop every persisted route for one session. Untagged rows are owned by the
  * ambient backend that returned them, so a stale explicit hint must not force a
  * later resume onto a different connection. */

@@ -256,6 +256,34 @@ describe('useBackgroundQueueDrain', () => {
     expect(getQueuedPrompts('root-a')).toHaveLength(1)
   })
 
+  it('sends a root-keyed queue to the live compression tip, not the frozen root', async () => {
+    // A compressed conversation keeps its queue under the lineage root, but the
+    // root is a frozen segment whose owner hint can name a removed connection.
+    // Draining there resumed the root, failed "No connection with id", and the
+    // prompt never left the queue. The drain must target the live tip.
+    const runtimeMap = { current: new Map([['tip-a', 'rt-tip-a']]) }
+    const submitText = vi.fn(async () => true)
+
+    setSessions([lineageSession({ id: 'tip-a', _lineage_root_id: 'root-a', _lineage_ids: ['root-a', 'tip-a'] })])
+    setSessionOwnerHint('root-a', { connectionId: 'removed-source', profile: 'default' })
+    const entry = enqueueQueuedPrompt('root-a', { text: 'queued after compaction', attachments: [] })!
+    clearAllSessionStates()
+
+    render(<Harness runtimeMap={runtimeMap} submitText={submitText} />)
+
+    await waitFor(() => {
+      expect(submitText).toHaveBeenCalledWith('queued after compaction', {
+        submission_id: entry.id,
+        attachments: [],
+        fromQueue: true,
+        sessionId: 'rt-tip-a',
+        storedSessionId: 'tip-a'
+      })
+    })
+
+    await waitFor(() => expect(getQueuedPrompts('root-a')).toHaveLength(0))
+  })
+
   it('does not drain a parked background session, even when idle', async () => {
     // A Stop in a tile parks that session's queue; when the user then focuses
     // another chat, THIS drainer takes over the tile's queue — it must honor
