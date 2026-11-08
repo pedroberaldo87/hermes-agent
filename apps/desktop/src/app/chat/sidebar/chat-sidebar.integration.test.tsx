@@ -7,6 +7,7 @@ import { group, split } from '@/components/pane-shell/tree/model'
 import { $layoutTree, noteActiveTreeGroup } from '@/components/pane-shell/tree/store'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { registry } from '@/contrib/registry'
+import { $touchPointer } from '@/lib/touch-interaction'
 import { $connectionsRegistry } from '@/store/connection-registry-state'
 import {
   $pinnedSessionIds,
@@ -205,6 +206,22 @@ describe('ChatSidebar navigation activity', () => {
 
     act(() => dispose())
     expect(screen.getByRole('button', { name: 'Kanban' })).toBeTruthy()
+  })
+
+  // A phone has no keyboard: the Webapp's touch layout drops the shortcut
+  // chip ("Alt N") from New session. A mouse/keyboard host keeps it.
+  it('drops the New session shortcut chip on a touch screen', () => {
+    const newSessionChip = () =>
+      screen.getByText('New session').closest('button')?.querySelector('[data-slot="kbd-group"]') ?? null
+
+    renderSidebar('/kanban', 'extension')
+    expect(newSessionChip()).not.toBeNull()
+
+    act(() => $touchPointer.set(true))
+    expect(newSessionChip()).toBeNull()
+
+    act(() => $touchPointer.set(false))
+    expect(newSessionChip()).not.toBeNull()
   })
 })
 

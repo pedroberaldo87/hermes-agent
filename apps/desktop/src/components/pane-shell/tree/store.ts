@@ -6,7 +6,7 @@
 
 import { atom, computed, type ReadableAtom } from 'nanostores'
 
-import { SIDEBAR_COLLAPSE_MEDIA_QUERY } from '@/app/layout-constants'
+import { narrowViewportMediaQuery } from '@/app/layout-constants'
 import { setPluginEnabled } from '@/contrib/plugins-store'
 import { registry } from '@/contrib/registry'
 import { translateNow } from '@/i18n'
@@ -841,7 +841,7 @@ export function shownPanesInGroup(group: { panes: readonly string[] }): string[]
     // panes drop out of the strip when the viewport collapses them.
     if (
       typeof window !== 'undefined' &&
-      window.matchMedia?.(SIDEBAR_COLLAPSE_MEDIA_QUERY).matches &&
+      window.matchMedia?.(narrowViewportMediaQuery()).matches &&
       Boolean((pane.data as { collapsible?: boolean } | undefined)?.collapsible)
     ) {
       return false
@@ -1305,7 +1305,7 @@ export function revealTreePane(paneId: string) {
 // Optional-chained + `typeof window` guarded like every other matchMedia call
 // site: this module is imported by non-DOM code paths (session actions) whose
 // test env has no `window`/`matchMedia` — an unguarded call throws at load.
-const narrowQuery = typeof window !== 'undefined' ? window.matchMedia?.(SIDEBAR_COLLAPSE_MEDIA_QUERY) : undefined
+const narrowQuery = typeof window !== 'undefined' ? window.matchMedia?.(narrowViewportMediaQuery()) : undefined
 
 export const $narrowViewport = atom(Boolean(narrowQuery?.matches))
 
