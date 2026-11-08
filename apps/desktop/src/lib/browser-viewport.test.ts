@@ -47,6 +47,8 @@ afterEach(() => {
   document.documentElement.removeAttribute('data-hermes-desktop-host')
   document.documentElement.style.removeProperty('zoom')
   vi.unstubAllGlobals()
+  vi.useRealTimers()
+  delete (screen as { orientation?: unknown }).orientation
 })
 
 describe('browser visible viewport', () => {
@@ -79,21 +81,109 @@ describe('browser visible viewport', () => {
     resize(460, 25)
     expect(root.style.getPropertyValue('--browser-viewport-height')).toBe('368px')
     expect(root.style.getPropertyValue('--browser-viewport-top')).toBe('20px')
-    editor.blur()
     resize(500, 0)
-    expect(document.activeElement).not.toBe(editor)
-    expect(root.hasAttribute('data-browser-viewport')).toBe(true)
+    expect(root.style.getPropertyValue('--browser-viewport-height')).toBe('400px')
 
-    // Rotation/layout-resizing browsers already made room for the keyboard.
+    // Layout-resizing browsers already made room for the keyboard.
     vi.stubGlobal('innerHeight', 500)
     window.dispatchEvent(new Event('resize'))
     flush()
     expect(root.hasAttribute('data-browser-viewport')).toBe(false)
     expect(root.style.getPropertyValue('--browser-viewport-height')).toBe('')
     vi.stubGlobal('innerHeight', 800)
+    resize(460, 25)
+    expect(root.style.getPropertyValue('--browser-viewport-height')).toBe('368px')
+
+    // Leaving the field closes the keyboard: the fit goes with it, even before
+    // the visible area reports its full height, and focus is not moved back.
+    editor.blur()
+    flush()
+    expect(document.activeElement).not.toBe(editor)
+    expect(root.hasAttribute('data-browser-viewport')).toBe(false)
+    resize(500, 0)
+    expect(root.hasAttribute('data-browser-viewport')).toBe(false)
     resize(800)
     expect(root.hasAttribute('data-browser-viewport')).toBe(false)
     expect(editor.value).toBe('first line\nsecond line')
+  })
+
+  // iPhone home-screen Webapp, rotated with the composer focused: iOS reports
+  // in-between visual viewports while it turns. Applied, a stale top left a
+  // black band over the app and a stale height pushed the composer off-screen.
+  it('drops the keyboard fit the moment the phone rotates and re-measures once the rotation settles', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const orientation = new EventTarget()
+    Object.defineProperty(screen, 'orientation', { configurable: true, value: orientation })
+    const editor = document.createElement('textarea')
+    root.append(editor)
+    editor.focus()
+    vi.stubGlobal('innerWidth', 390)
+    vi.stubGlobal('innerHeight', 800)
+    dispose = installBrowserViewport()
+    resize(460, 25)
+    expect(root.style.getPropertyValue('--browser-viewport-top')).toBe('25px')
+
+    const turnTo = (width: number, height: number, fire: () => void) => {
+      vi.stubGlobal('innerWidth', width)
+      vi.stubGlobal('innerHeight', height)
+      fire()
+      // The fit is gone at once: no band, no short shell during the turn.
+      expect(root.hasAttribute('data-browser-viewport')).toBe(false)
+      expect(root.style.getPropertyValue('--browser-viewport-top')).toBe('')
+      expect(root.style.getPropertyValue('--browser-viewport-height')).toBe('')
+
+      // In-between samples while it turns are ignored.
+      resize(300, 420)
+      flush()
+      expect(root.hasAttribute('data-browser-viewport')).toBe(false)
+      vi.advanceTimersByTime(299)
+      expect(root.hasAttribute('data-browser-viewport')).toBe(false)
+    }
+
+    turnTo(844, 390, () => window.dispatchEvent(new Event('orientationchange')))
+    // Settled: the landscape keyboard leaves 190px, at the top.
+    Object.assign(viewport, { height: 190, offsetTop: 0, scale: 1 })
+    vi.advanceTimersByTime(1)
+    expect(root.style.getPropertyValue('--browser-viewport-height')).toBe('190px')
+    expect(root.style.getPropertyValue('--browser-viewport-top')).toBe('0px')
+
+    // screen.orientation 'change' and a width-changing resize are the same turn.
+    turnTo(390, 800, () => orientation.dispatchEvent(new Event('change')))
+    // Settled with the keyboard closed: nothing to fit.
+    Object.assign(viewport, { height: 800, offsetTop: 0, scale: 1 })
+    vi.advanceTimersByTime(1)
+    expect(root.hasAttribute('data-browser-viewport')).toBe(false)
+
+    resize(460, 25)
+    expect(root.style.getPropertyValue('--browser-viewport-top')).toBe('25px')
+    turnTo(844, 390, () => window.dispatchEvent(new Event('resize')))
+    // A visible area taller than the layout is an in-between sample, never a keyboard.
+    Object.assign(viewport, { height: 700, offsetTop: 0, scale: 1 })
+    vi.advanceTimersByTime(1)
+    expect(root.hasAttribute('data-browser-viewport')).toBe(false)
+
+    // Settled, the keyboard still fits the way it did before any rotation.
+    resize(190, 0)
+    expect(root.style.getPropertyValue('--browser-viewport-height')).toBe('190px')
+    expect(document.activeElement).toBe(editor)
+  })
+
+  it('fits nothing while no text field is focused, whatever the visible area reports', () => {
+    const button = document.createElement('button')
+    root.append(button)
+    button.focus()
+    dispose = installBrowserViewport()
+    resize(460, 25)
+    expect(root.hasAttribute('data-browser-viewport')).toBe(false)
+
+    const editor = document.createElement('div')
+    editor.setAttribute('contenteditable', 'true')
+    // jsdom only focuses a contenteditable that is also tabbable.
+    editor.tabIndex = 0
+    root.append(editor)
+    editor.focus()
+    flush()
+    expect(root.style.getPropertyValue('--browser-viewport-height')).toBe('460px')
   })
 
   it('leaves a focus-zoomed iOS keyboard to Safari, whose innerHeight is the visible area', () => {
@@ -125,6 +215,9 @@ describe('browser visible viewport', () => {
     installBrowserViewport()()
     expect(root.hasAttribute('data-browser-viewport')).toBe(false)
     vi.stubGlobal('visualViewport', viewport)
+    const editor = document.createElement('textarea')
+    root.append(editor)
+    editor.focus()
     dispose = installBrowserViewport()
     expect(root.hasAttribute('data-browser-viewport')).toBe(true)
     viewport.dispatchEvent(new Event('resize'))
