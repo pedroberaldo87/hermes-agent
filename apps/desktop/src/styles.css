@@ -12,8 +12,23 @@
 
 /* v4 gates hover: on @media (hover: hover). Some Windows hosts with a
    digitizer answer false even with a mouse, so hover-reveal controls stay
-   opacity-0 (clickable, invisible). Trust :hover itself. */
-@custom-variant hover (&:hover);
+   opacity-0 (clickable, invisible). Native Desktop trusts :hover itself.
+   The browser host (the Webapp) also runs on phones, where iOS keeps :hover
+   on the last tapped element until the next tap elsewhere: rows and buttons
+   stay highlighted. There, hover needs a pointer that can hover at all.
+   `any-hover` (not `hover`) so a digitizer laptop with a mouse still hovers.
+   `:where()` keeps each rule's specificity that of a plain `&:hover`. */
+@custom-variant hover {
+  &:hover:where(html:not([data-hermes-desktop-host='browser']) *) {
+    @slot;
+  }
+
+  @media (any-hover: hover) {
+    &:hover:where(html[data-hermes-desktop-host='browser'] *) {
+      @slot;
+    }
+  }
+}
 @custom-variant dark (&:is(.dark *));
 
 /* Blanket reduced-motion override: kill ALL CSS animations and transitions

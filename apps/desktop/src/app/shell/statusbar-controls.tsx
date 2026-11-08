@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { type ComponentProps, createContext, memo, type ReactNode, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { $narrowViewport } from '@/components/pane-shell/tree/store'
 import {
   ContextMenu,
   ContextMenuCheckboxItem,
@@ -16,6 +17,7 @@ import { Tip, TipKeybindLabel, Tooltip, TooltipContent, TooltipProvider, Tooltip
 import { ContribRender } from '@/contrib/react/boundary'
 import { useI18n } from '@/i18n'
 import { useKeybindHint } from '@/lib/keybinds/use-keybind-hint'
+import { isBrowserHostedDesktop } from '@/lib/platform'
 import { cn } from '@/lib/utils'
 import {
   $statusbarHiddenIds,
@@ -104,6 +106,11 @@ interface StatusbarControlsProps extends ComponentProps<'footer'> {
 export function StatusbarControls({ className, leftItems = [], items = [], ...props }: StatusbarControlsProps) {
   const navigate = useNavigate()
   const hiddenIds = useStore($statusbarHiddenIds)
+  // The Webapp on a phone: the right cluster alone is wider than the screen.
+  // Clipped, its last items were unreachable; there it swipes sideways
+  // instead (items keep their width, no scrollbar painted). Native Desktop
+  // keeps clipping.
+  const scrollRight = useStore($narrowViewport) && isBrowserHostedDesktop()
 
   const visible = (item: StatusbarItem) =>
     !item.hidden && (item.lockedVisible || !item.toggleLabel || !hiddenIds.includes(item.id))
@@ -128,7 +135,15 @@ export function StatusbarControls({ className, leftItems = [], items = [], ...pr
               <StatusbarItemView item={item} key={`left:${item.id}`} navigate={navigate} />
             ))}
           </div>
-          <div className="flex min-w-0 items-stretch gap-0.5 overflow-x-clip">
+          <div
+            className={cn(
+              'flex min-w-0 items-stretch gap-0.5',
+              scrollRight
+                ? 'overflow-x-auto overscroll-x-contain [scrollbar-width:none] *:shrink-0 [&::-webkit-scrollbar]:hidden'
+                : 'overflow-x-clip'
+            )}
+            data-statusbar-side="right"
+          >
             {items.filter(visible).map(item => (
               <StatusbarItemView item={item} key={`right:${item.id}`} navigate={navigate} />
             ))}

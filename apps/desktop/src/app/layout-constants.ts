@@ -1,3 +1,5 @@
+import { isBrowserHostedDesktop } from '@/lib/platform'
+
 // Responsive horizontal gutter for primary content bodies (settings right side,
 // skills, artifacts, command center / sessions). Ratio-based so it scales with
 // the window, but clamped so it never collapses on narrow widths or runs away
@@ -30,3 +32,16 @@ export const PAGE_MAX_W = 'max-w-[75rem]'
 export const SIDEBAR_DOCK_MIN_WIDTH_PX = 640
 // `max-width` is inclusive: shave a hair so an exactly-640px window docks.
 export const SIDEBAR_COLLAPSE_MEDIA_QUERY = `(max-width: ${SIDEBAR_DOCK_MIN_WIDTH_PX - 0.02}px)`
+
+// The Webapp is opened on phones. A phone in landscape is ~750-844px wide but
+// only ~340-390px tall, and the 640px width alone hands it the desktop layout:
+// docked rails and side-by-side chat zones in a few hundred pixels of height.
+// On the browser host, narrow also means a short touch screen. 767.98px matches
+// `useIsMobile` (the floating-sidebar breakpoint), so the two agree there.
+export const BROWSER_NARROW_MEDIA_QUERY = '(max-width: 767.98px), (pointer: coarse) and (max-height: 500px)'
+
+/** The query behind the narrow layout ($narrowViewport, rail overlays, narrow
+ *  reveal routing). Native Desktop keeps its 640px window breakpoint. */
+export function narrowViewportMediaQuery(): string {
+  return isBrowserHostedDesktop() ? BROWSER_NARROW_MEDIA_QUERY : SIDEBAR_COLLAPSE_MEDIA_QUERY
+}
