@@ -80,6 +80,7 @@ import {
   noteActiveTreeGroup,
   reloadTreePane,
   restoreTreePane,
+  revealTreePane,
   SESSION_TILE_DRAG,
   setStripTabHidden,
   setTreeGroupMinimized,
@@ -104,7 +105,9 @@ import { usePanelTitlebar } from './panel-titlebar'
 import { tabStripVisibleForZone } from './strip-visibility'
 import { useActiveTabVisible } from './tab-strip-scroll'
 import { paneChrome } from './track-model'
+import { useOtherChatZones } from './use-other-chat-zones'
 import { useZoneHeaderLayout } from './zone-header-layout'
+import { zoneNewTab } from './zone-new-tab'
 
 /** Right-click zone menu: the tab verbs (close this / others / to the right /
  *  all) plus the strip's own chrome toggles. Same items and icons as a session
@@ -321,7 +324,8 @@ function EditVeil({ label, onPointerDown, top, ...menu }: EditVeilProps) {
 
 type CompactTabPickerProps = ComponentProps<typeof CompactTabPicker>
 
-interface CompactZoneTabsProps extends Pick<CompactTabPickerProps, 'activeId' | 'newTab' | 'tabActions' | 'tabs'> {
+interface CompactZoneTabsProps
+  extends Pick<CompactTabPickerProps, 'activeId' | 'newTab' | 'otherZones' | 'tabActions' | 'tabs'> {
   belowControls: boolean
   /** The active tab takes Close (see TreeGroup's `closeableTab`). */
   closeable: boolean
@@ -330,7 +334,16 @@ interface CompactZoneTabsProps extends Pick<CompactTabPickerProps, 'activeId' | 
 
 /** A narrow touch zone's tab row: the picker in place of the scrolling strip.
  *  Picking a tab is a strip tap, so a minimized zone restores first. */
-function CompactZoneTabs({ activeId, belowControls, closeable, newTab, node, tabActions, tabs }: CompactZoneTabsProps) {
+function CompactZoneTabs({
+  activeId,
+  belowControls,
+  closeable,
+  newTab,
+  node,
+  otherZones,
+  tabActions,
+  tabs
+}: CompactZoneTabsProps) {
   return (
     <div
       className={cn('flex min-w-0 flex-1', belowControls && 'absolute inset-x-0 bottom-0')}
@@ -350,6 +363,14 @@ function CompactZoneTabs({ activeId, belowControls, closeable, newTab, node, tab
 
           activateTreePane(node.id, paneId)
         }}
+        onSelectOther={(zoneId, paneId) => {
+          clearTabSelection()
+          // The picked zone becomes the one on screen (and the ⌘W target);
+          // reveal fronts the tab and restores a minimized zone.
+          noteActiveTreeGroup(zoneId)
+          revealTreePane(paneId)
+        }}
+        otherZones={otherZones}
         tabActions={tabActions}
         tabs={tabs}
       />
@@ -474,24 +495,9 @@ export function TreeGroup({
 
   const pageHeader = paneChrome(active).headerContent
 
-  // What the strip's "+" makes. The pane you are LOOKING AT answers first (a
-  // Browser tab makes another Browser, even stacked into the chat strip), then
-  // the chat "+" for any zone holding session tabs, then any other tenant that
-  // can mint its own kind — that last rung is what keeps the button from
-  // blinking out when you click a file tab sitting beside a Browser.
-  const ownNewTab = (id: string) => {
-    const mint = paneChrome(paneFor(id)).newTab
+  const otherChatZones = useOtherChatZones(node.id, compactTabs, paneShown)
 
-    return mint ? { label: t.zones.newTab, onSelect: mint } : null
-  }
-
-  const newTab =
-    ownNewTab(activeId) ??
-    (shown.some(isSessionStripPane) && newSessionTabAction
-      ? { label: t.zones.newSessionTab, onSelect: newSessionTabAction }
-      : null) ??
-    shown.map(ownNewTab).find(Boolean) ??
-    null
+  const newTab = zoneNewTab({ activeId, labels: t.zones, newSessionTabAction, paneFor, shown })
 
   useEffect(() => {
     if (activeId) {
@@ -567,8 +573,12 @@ export function TreeGroup({
   const verticalCollapse = Boolean(node.minimized) && parentAxis === 'row' && !isEmpty
 
   // A minimized group IS its header, so it shows one regardless.
+  // The picker is also the way to the other chat zones, so it outranks a
+  // hidden strip while it has any to offer.
   const headerVisible =
-    !isEmpty && !verticalCollapse && (Boolean(node.minimized) || stripVisible || Boolean(pageHeader))
+    !isEmpty &&
+    !verticalCollapse &&
+    (Boolean(node.minimized) || stripVisible || Boolean(pageHeader) || otherChatZones.length > 0)
 
   const topHeaderHeight = titlebarHeight + (tabsBelowControls && headerVisible ? tabStripHeight : 0)
 
@@ -634,6 +644,7 @@ export function TreeGroup({
   // String twin of `tabLabel` for the drag ghost / edit veil: resolved at
   // drag start, so a locale-following pane reads its LOADED-locale label.
   const tabText = (paneId: string) => paneChrome(paneFor(paneId)).tabTitleText?.() ?? paneFor(paneId)?.title ?? paneId
+  const pickerTab = (paneId: string) => ({ id: paneId, label: tabLabel(paneId), title: tabText(paneId) })
 
   // Collapse/restore a tool panel (or plain minimize elsewhere) — the header
   // chevron, routed so ⌃`/the titlebar toggle stay truthful. The strip itself
@@ -750,8 +761,9 @@ export function TreeGroup({
               closeable={closeableTab(activeId)}
               newTab={newTab}
               node={node}
+              otherZones={otherChatZones.map(zone => ({ id: zone.id, tabs: zone.panes.map(pickerTab) }))}
               tabActions={paneId => paneChrome(paneFor(paneId)).tabActions?.()}
-              tabs={shown.map(id => ({ id, label: tabLabel(id), title: tabText(id) }))}
+              tabs={shown.map(pickerTab)}
             />
           ) : headerVisible ? (
             <ZoneMenu {...zoneMenu}>

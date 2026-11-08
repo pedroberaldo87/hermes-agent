@@ -4456,7 +4456,8 @@ export const en: Translations = {
     notExpressible: 'this arrangement interlocks (pinwheel) — not expressible as nested splits yet',
     zoneCount: count => `${count} zones`,
     tabCount: count => `${count} tab${count === 1 ? '' : 's'}`,
-    tabActions: title => `Actions for ${title}`
+    tabActions: title => `Actions for ${title}`,
+    otherChats: 'Other chats'
   },
 
   contextMenu: {

@@ -585,7 +585,8 @@ export const arChrome = {
     notExpressible: 'هذا الترتيب متشابك — لا يمكن تمثيله كتقسيمات متداخلة بعد',
     zoneCount: count => `${count} مناطق`,
     tabCount: count => `${count} تبويبات`,
-    tabActions: title => `إجراءات ${title}`
+    tabActions: title => `إجراءات ${title}`,
+    otherChats: 'محادثات أخرى'
   },
   contextMenu: {
     link: {
