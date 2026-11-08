@@ -121,6 +121,26 @@ export function findGroupOfPane(node: LayoutNode, paneId: string): GroupNode | n
   return null
 }
 
+export function findSplitWeights(node: LayoutNode, splitId: string): number[] | null {
+  if (node.type !== 'split') {
+    return null
+  }
+
+  if (node.id === splitId) {
+    return node.weights
+  }
+
+  for (const child of node.children) {
+    const hit = findSplitWeights(child, splitId)
+
+    if (hit) {
+      return hit
+    }
+  }
+
+  return null
+}
+
 export function allPaneIds(node: LayoutNode): string[] {
   return node.type === 'group' ? [...node.panes] : node.children.flatMap(allPaneIds)
 }

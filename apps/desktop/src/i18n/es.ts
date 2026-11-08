@@ -4865,7 +4865,8 @@ export const esOverrides = {
     notExpressible: 'esta disposición se entrelaza (en molinete) y aún no puede expresarse como divisiones anidadas',
     zoneCount: count => `${count} zonas`,
     tabCount: count => `${count} pestañas`,
-    tabActions: title => `Acciones de ${title}`
+    tabActions: title => `Acciones de ${title}`,
+    otherChats: 'Otros chats'
   },
   contextMenu: {
     link: {

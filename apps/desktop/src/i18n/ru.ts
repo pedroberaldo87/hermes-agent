@@ -3537,7 +3537,8 @@ export const ruOverrides = {
     notExpressible: 'эта расстановка зацеплена (pinwheel) — пока не выразима как вложенные разделения',
     zoneCount: count => `${count} ${RU_NOUN(count, 'зона', 'зоны', 'зон')}`,
     tabCount: count => `${count} ${RU_NOUN(count, 'вкладка', 'вкладки', 'вкладок')}`,
-    tabActions: title => `Действия: ${title}`
+    tabActions: title => `Действия: ${title}`,
+    otherChats: 'Другие чаты'
   },
   contextMenu: {
     link: {

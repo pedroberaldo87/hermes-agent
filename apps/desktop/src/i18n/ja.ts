@@ -3281,7 +3281,8 @@ export const jaOverrides = {
     notExpressible: 'この配置は互いに噛み合っています（風車型）— 入れ子の分割では表現できません',
     zoneCount: count => `${count} ゾーン`,
     tabCount: count => `${count} 個のタブ`,
-    tabActions: title => `${title} の操作`
+    tabActions: title => `${title} の操作`,
+    otherChats: 'その他のチャット'
   },
 
   contextMenu: {

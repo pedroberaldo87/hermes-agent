@@ -531,7 +531,8 @@ export const zhHantChrome = {
     notExpressible: '此排列互相咬合（風車形）——暫時無法表示為巢狀分割',
     zoneCount: count => `${count} 個區域`,
     tabCount: count => `${count} 個分頁`,
-    tabActions: title => `${title} 的動作`
+    tabActions: title => `${title} 的動作`,
+    otherChats: '其他聊天'
   },
 
   contextMenu: {
