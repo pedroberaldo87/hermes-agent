@@ -18,6 +18,7 @@ import { notify } from '@/store/notifications'
 import { clearAllPaneSizeOverrides } from '@/store/panes'
 import { isBrowserWindow, isSecondaryWindow } from '@/store/windows'
 
+import { noteFrontChatZone } from './front-chat-zone'
 import {
   allPaneIds,
   anchorsFirst,
@@ -25,6 +26,7 @@ import {
   findGroup,
   findGroupOfPane,
   findParentSplit,
+  findSplitWeights,
   groupLeafIds,
   type GroupNode,
   insertAtGroup,
@@ -495,6 +497,8 @@ export function noteActiveTreeGroup(groupId: null | string) {
   if (groupId !== $activeTreeGroup.get()) {
     $activeTreeGroup.set(groupId)
   }
+
+  noteFrontChatZone($layoutTree.get(), groupId, isSessionStripPane)
 }
 
 /** The zone the pointer is currently over, or null off every zone. Transient —
@@ -1283,6 +1287,12 @@ export function revealTreePane(paneId: string) {
 
     if (next !== tree) {
       commit(next)
+    }
+
+    // Revealing a chat (opening it from the sidebar, a route) fronts its zone
+    // on a phone too, where sibling chat zones take turns on screen.
+    if (isSessionStripPane(paneId)) {
+      noteFrontChatZone($layoutTree.get(), group.id, isSessionStripPane)
     }
   }
 }
@@ -2188,26 +2198,6 @@ export function setTreeSplitWeights(splitId: string, weights: number[]) {
     // Weight drags are high-frequency: update live, persist on the trailing edge.
     $layoutTree.set(setSplitWeightsOp(tree, splitId, weights))
   }
-}
-
-function findSplitWeights(node: LayoutNode, splitId: string): number[] | null {
-  if (node.type !== 'split') {
-    return null
-  }
-
-  if (node.id === splitId) {
-    return node.weights
-  }
-
-  for (const child of node.children) {
-    const hit = findSplitWeights(child, splitId)
-
-    if (hit) {
-      return hit
-    }
-  }
-
-  return null
 }
 
 /**

@@ -18,12 +18,14 @@ import { $paneStates, type PaneStateSnapshot, setPaneHeightOverride, setPaneWidt
 
 import { $layoutEditMode, $layoutEditRevealsHidden } from '../../edit-mode'
 import type { LayoutNode, SplitNode } from '../model'
-import { allPaneIds } from '../model'
+import { allPaneIds, findGroup } from '../model'
+import { $narrowFrontChatZone } from '../narrow-chat-zones'
 import {
   $collapsedTreeSides,
   $hiddenTreePanes,
   $narrowViewport,
   isCollapsePane,
+  isSessionStripPane,
   paneRootSide,
   persistTree,
   presetSplitWeights,
@@ -106,6 +108,7 @@ export function TreeSplit({
   const panes = useContributions('panes')
   const hiddenPanes = useStore($hiddenTreePanes)
   const narrow = useStore($narrowViewport)
+  const frontChatZone = useStore($narrowFrontChatZone)
   // Scoped to THIS subtree's panes: a sash drag writes size overrides on every
   // pointermove, but only the splits whose subtree actually resized should
   // re-render — not every split in the tree.
@@ -663,17 +666,43 @@ export function TreeSplit({
     return side !== null && collapsedSides.has(side)
   }
 
+  // A PHONE shows one chat at a time: when two or more visible children host
+  // chat tabs, only the FRONT one renders — the zone the user last worked in
+  // or had a chat revealed into, else the workspace's, else the first. The
+  // others take the chrome-toggle path (display:none, still MOUNTED, so
+  // streams and drafts survive and switching back is instant). Render-only:
+  // the tree keeps its split, so widening the window brings it back.
+  const chatIndexes = narrow
+    ? node.children.flatMap((child, i) =>
+        !isCollapsed(child) &&
+        !sideGone(i) &&
+        !isMinimized(child) &&
+        allPaneIds(child).some(id => isSessionStripPane(id) && !paneGone(id))
+          ? [i]
+          : []
+      )
+    : []
+
+  const frontChatIndex =
+    chatIndexes.length < 2
+      ? -1
+      : (chatIndexes.find(i => frontChatZone !== null && findGroup(node.children[i], frontChatZone)) ??
+        chatIndexes.find(i => allPaneIds(node.children[i]).includes('workspace')) ??
+        chatIndexes[0])
+
   // One pass per child: collapse/minimize state, resolved fixed track, clamps,
   // and narrow-unmount flag. fixedTrackSize + subtreeGone each re-walk the
   // subtree, so resolve them ONCE here instead of per read below.
   const tracks = node.children.map((child, i) => {
     const minimized = isMinimized(child)
-    const collapsed = isCollapsed(child) || sideGone(i)
+    const gone = isCollapsed(child) || sideGone(i)
+    const collapsed = gone || (frontChatIndex >= 0 && i !== frontChatIndex && chatIndexes.includes(i))
     const track = minimized || collapsed ? null : fixedTrackSize(child, axis, trackCtx)
     const sizing = minimized || collapsed ? null : sizingFor(child, track)
     // Narrow-collapse UNMOUNTS (the edge overlay owns the live instance) — but
-    // only for panes the breakpoint collapsed, not ones a chrome toggle hid.
-    const narrowCollapsed = narrow && collapsed && allPaneIds(child).some(id => !hiddenPanes.has(id))
+    // only for panes the breakpoint collapsed, not ones a chrome toggle hid,
+    // and never a chat zone waiting its turn on a phone.
+    const narrowCollapsed = narrow && gone && allPaneIds(child).some(id => !hiddenPanes.has(id))
 
     return { child, collapsed, minimized, narrowCollapsed, sizing, track }
   })

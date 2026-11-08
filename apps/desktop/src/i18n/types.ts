@@ -3923,6 +3923,8 @@ export interface Translations extends NoticeTranslations {
     tabCount: (count: number) => string
     /** A phone tab picker row's actions button (names the tab). */
     tabActions: (title: string) => string
+    /** A phone tab picker's section listing the chat zones kept off screen. */
+    otherChats: string
   }
 
   contextMenu: {

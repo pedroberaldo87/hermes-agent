@@ -4905,7 +4905,8 @@ export const frOverrides = {
     notExpressible: "cet agencement s'entrelace (roue) — pas encore exprimable comme des divisions imbriquées",
     zoneCount: count => `${count} zones`,
     tabCount: count => `${count} onglet${count === 1 ? '' : 's'}`,
-    tabActions: title => `Actions pour ${title}`
+    tabActions: title => `Actions pour ${title}`,
+    otherChats: 'Autres discussions'
   },
   contextMenu: {
     link: {
