@@ -104,9 +104,12 @@ def apply_action(db, conn, session_id, operation, payload, *, prepared=None):
     result = {}
     for key, value in payload.items():
         if key == 'title':
+            # The listing shows a compressed conversation under its TIP's title, so a rename sent
+            # to an ended segment (a tab or row opened before the rotation) must land on the tip.
+            target = db._compression_tip_on(conn, session_id)
             affected.update(db._set_session_title_in_transaction(
-                conn, session_id, value, source=db.TITLE_SOURCE_USER))
-            result[key] = conn.execute('SELECT title FROM sessions WHERE id=?', (session_id,)).fetchone()[0]
+                conn, target, value, source=db.TITLE_SOURCE_USER))
+            result[key] = conn.execute('SELECT title FROM sessions WHERE id=?', (target,)).fetchone()[0]
         else:
             column = 'last_read_at' if key == 'unread' else key
             stored = (0.0 if value else time.time()) if key == 'unread' else int(value)
