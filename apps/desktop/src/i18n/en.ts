@@ -3233,6 +3233,7 @@ export const en: Translations = {
       cron: 'Scheduled jobs'
     },
     searchAria: 'Search sessions',
+    resizeNav: 'Resize navigation (double-click to reset)',
     searchPlaceholder: 'Search sessions…',
     clearSearch: 'Clear search',
     noMatch: query => `No sessions match “${query}”.`,
