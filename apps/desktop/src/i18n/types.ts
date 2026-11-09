@@ -2834,6 +2834,7 @@ export interface Translations extends NoticeTranslations {
     profileRail: string
     nav: Record<string, string>
     searchAria: string
+    resizeNav: string
     searchPlaceholder: string
     clearSearch: string
     noMatch: (query: string) => string
