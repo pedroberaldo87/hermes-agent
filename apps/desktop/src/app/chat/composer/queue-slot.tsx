@@ -6,10 +6,16 @@ import { useStoresSelector } from '@/lib/use-session-slice'
 import { type QueuedPromptEntry, removeQueuedPrompt, unparkQueuedPrompts } from '@/store/composer-queue'
 import { notifyError } from '@/store/notifications'
 import { $activeSessionId, $selectedStoredSessionId } from '@/store/session'
-import { $sessionStates, $sessionTiles, storedSessionIdForRuntimeId } from '@/store/session-states'
+import {
+  $sessionStates,
+  $sessionTiles,
+  requestForOwnedSession,
+  storedSessionIdForRuntimeId
+} from '@/store/session-states'
 
 import type { QueueEditState } from './composer-utils'
 import { cancelQueuedPrompt, discardLostPrompt, steerQueuedPrompt } from './discard-lost-prompt'
+import { forceQueuedPrompt } from './force-queued-prompt'
 import { QueuePanel } from './queue-panel'
 
 export interface ComposerQueueSlotInputs {
@@ -122,6 +128,25 @@ export function renderComposerQueueSlot({
           : undefined
       }
       onEdit={beginQueuedEdit}
+      onForceNow={
+        gateway
+          ? id => {
+              const request = gateway.request.bind(gateway)
+
+              void forceQueuedPrompt({
+                call: (method, params) => requestForOwnedSession(activeQueueSessionKey, request, method, params),
+                entries: queuedPrompts,
+                id,
+                queueSessionKey: activeQueueSessionKey,
+                sessionId: sessionId ?? activeQueueSessionKey
+              }).then(outcome => {
+                if (outcome.status === 'failed') {
+                  notifyError(outcome.error, t.composer.queueForce)
+                }
+              })
+            }
+          : undefined
+      }
       onResume={() => {
         unparkQueuedPrompts(activeQueueSessionKey)
 

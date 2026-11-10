@@ -3955,6 +3955,8 @@ export const frOverrides = {
     queueCollapse: 'Replier',
     queueSendNext: 'Suivant',
     queueSteer: 'Diriger — réorienter maintenant le tour en cours',
+    queueForce: 'Forcer — arrêter le tour en cours et exécuter ceci ensuite',
+    queueForceBlocked: 'Impossible de forcer devant un tour en file avec pièces jointes, ou quand un tour perdu met la file en pause',
     queueSend: 'Envoyer',
     queueDelete: 'Supprimer',
     queueResume: 'Reprendre',

@@ -3008,6 +3008,8 @@ export interface Translations extends NoticeTranslations {
     queueSendNext: string
     queueSend: string
     queueSteer: string
+    queueForce: string
+    queueForceBlocked: string
     queueDelete: string
     queueLostNote: string
     restoreImageDraft: string
