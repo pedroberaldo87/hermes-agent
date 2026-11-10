@@ -3935,6 +3935,8 @@ export const esOverrides = {
     queueCollapse: 'Contraer',
     queueSendNext: 'Próximo',
     queueSteer: 'Redirigir — encauzar el turno en vivo ahora',
+    queueForce: 'Forzar — detener el turno en vivo y ejecutar esto a continuación',
+    queueForceBlocked: 'No se puede forzar por delante de un turno en cola con adjuntos, ni con la cola pausada por un turno perdido',
     queueSend: 'Enviar',
     queueDelete: 'Borrar',
     queueResume: 'Reanudar',

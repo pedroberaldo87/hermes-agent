@@ -160,6 +160,8 @@ export const zhHantChat = {
     queueCollapse: '收起',
     queueSendNext: '下一個',
     queueSteer: '引導 — 立即修正目前回合',
+    queueForce: '強制 — 停止目前回合並接著執行這則',
+    queueForceBlocked: '無法越過含附件的排隊回合強制執行，或佇列因遺失的回合而暫停',
     queueSend: '傳送',
     queueDelete: '刪除',
     queueResume: '繼續',

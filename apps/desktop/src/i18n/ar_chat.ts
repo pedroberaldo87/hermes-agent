@@ -138,6 +138,8 @@ export const arChat = {
     queueCollapse: 'طي',
     queueSendNext: 'إرسالها تاليا',
     queueSteer: 'توجيه — تصحيح الدور الجاري فورا',
+    queueForce: 'فرض — أوقف الدور الجاري وشغّل هذا تاليا',
+    queueForceBlocked: 'لا يمكن الفرض متجاوزا دورا منتظرا به مرفقات، أو أثناء توقف الطابور بسبب دور مفقود',
     queueSend: 'إرسالها الآن',
     queueDelete: 'حذف من الطابور',
     queueStuckTitle: 'لم تُرسل الرسالة في قائمة الانتظار',

@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
 import { type Translations, useI18n } from '@/i18n'
-import { CornerDownLeft, iconSize, Pencil, SteeringWheel } from '@/lib/icons'
+import { CornerDownLeft, iconSize, Pencil, SteeringWheel, Zap } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { isSteerableEntry, type QueuedPromptEntry } from '@/store/composer-queue'
+
+import { type ForceBlock, forceBlock } from './force-queued-prompt'
 
 interface QueuePanelProps {
   busy: boolean
@@ -19,6 +21,9 @@ interface QueuePanelProps {
    *  the queued turns behind it flow again. Absent on non-canonical hosts. */
   onDiscardLost?: (id: string) => void
   onEdit: (entry: QueuedPromptEntry) => void
+  /** Make a server-queued row the next turn now: the rows ahead move behind it, then the running
+   *  turn stops. Absent when the host has no owner to ask. */
+  onForceNow?: (id: string) => void
   /** Lift a park (explicit Stop/Esc halt) and let the queue flow again. */
   onResume: () => void
   onSendNow: (id: string) => void
@@ -45,6 +50,7 @@ export function QueuePanel({
   onDelete,
   onDiscardLost,
   onEdit,
+  onForceNow,
   onResume,
   onSendNow,
   onSteerNow,
@@ -87,6 +93,11 @@ export function QueuePanel({
     // The owner died mid-turn and recovered this row as `unknown`: the
     // FIFO behind it is paused until someone acknowledges the loss.
     const lost = entry.serverStatus === 'unknown'
+
+    // Force: a server row while a turn runs (idle, the owner already runs the head).
+    const force: false | ForceBlock =
+      busy && Boolean(onForceNow) && entry.serverStatus === 'queued' && forceBlock(entries, entry.id)
+
     const preview = entryPreview(entry, c)
     const canExpand = shouldOfferExpandedPreview(preview)
     const isExpanded = expandedIds.has(entry.id)
@@ -130,6 +141,8 @@ export function QueuePanel({
               lost,
               onDiscardLost,
               onEdit,
+              force,
+              onForceNow,
               onSendNow,
               onSteerNow,
               canSteer
@@ -204,13 +217,16 @@ interface EntryActionsArgs {
   lost: boolean
   onDiscardLost?: (id: string) => void
   onEdit: (entry: QueuedPromptEntry) => void
+  /** `false`: no Force on this row; `null`: forceable; else why it is blocked. */
+  force: false | ForceBlock
+  onForceNow?: (id: string) => void
   onSendNow: (id: string) => void
   onSteerNow?: (id: string) => void
 }
 
 /** Per-row trailing actions: discard for a lost row, else edit/steer/send for a local one. A
- *  server row gets only the edit/steer its owner serves, never send-next: reordering it would
- *  break the owner's one FIFO. */
+ *  server row gets the edit/steer its owner serves plus Force, which never reorders the owner's
+ *  FIFO in place: it re-admits the rows ahead behind it and stops the running turn. */
 function renderEntryActions({
   busy,
   c,
@@ -221,6 +237,8 @@ function renderEntryActions({
   lost,
   onDiscardLost,
   onEdit,
+  force,
+  onForceNow,
   onSendNow,
   onSteerNow
 }: EntryActionsArgs) {
@@ -267,6 +285,22 @@ function renderEntryActions({
             variant="ghost"
           >
             <SteeringWheel className={iconSize.xs} />
+          </Button>
+        </Tip>
+      )}
+      {force !== false && (
+        <Tip label={force ? c.queueForceBlocked : c.queueForce}>
+          <Button
+            aria-label={c.queueForce}
+            className="size-5 rounded-md"
+            data-slot="queue-force"
+            disabled={isEditing || force !== null}
+            onClick={() => onForceNow?.(entry.id)}
+            size="icon-xs"
+            type="button"
+            variant="ghost"
+          >
+            <Zap className={iconSize.xs} />
           </Button>
         </Tip>
       )}

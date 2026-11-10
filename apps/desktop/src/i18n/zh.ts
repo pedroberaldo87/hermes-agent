@@ -3397,6 +3397,8 @@ export const zhOverrides = {
     queueCollapse: '收起',
     queueSendNext: '下一个',
     queueSteer: '引导 — 立即修正当前回合',
+    queueForce: '强制 — 停止当前回合并接着运行这条',
+    queueForceBlocked: '无法越过带附件的排队回合强制运行，或队列因丢失的回合而暂停',
     queueSend: '发送',
     queueDelete: '删除',
     queueLostNote: '重启期间该轮次已丢失',

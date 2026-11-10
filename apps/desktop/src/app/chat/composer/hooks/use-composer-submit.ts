@@ -68,7 +68,8 @@ interface UseComposerSubmitArgs {
   onSteerHidden: ChatBarProps['onSteerHidden']
   onSubmit: ChatBarProps['onSubmit']
   /** `submissionId`: the restored send this draft retries, so the owner deduplicates it. */
-  queueCurrentDraft: (submissionId?: string) => boolean | Promise<boolean>
+  /** `force`: admit the draft, then make it the next turn now (stops the running one). */
+  queueCurrentDraft: (submissionId?: string, force?: boolean) => boolean | Promise<boolean>
   queueEdit: QueueEditState | null
   queuedPrompts: QueuedPromptEntry[]
   sessionId: string | null | undefined
@@ -628,7 +629,7 @@ export function useComposerSubmit({
       .catch(keep)
   }
 
-  const queueDraft = () => {
+  const queueDraft = (force = false) => {
     if (disabled || !busy || refusedDuringSetup(draftRef.current)) {
       return
     }
@@ -639,7 +640,7 @@ export function useComposerSubmit({
     if (retry) {
       queueRetry(retry)
     } else {
-      queueCurrentDraft()
+      void queueCurrentDraft(undefined, force)
     }
 
     refocusAfterSend(editorHadFocus)

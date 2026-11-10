@@ -3946,6 +3946,8 @@ export const deOverrides = {
     queueCollapse: 'Einklappen',
     queueSendNext: 'Weiter',
     queueSteer: 'Steuern — laufenden Turn jetzt umleiten',
+    queueForce: 'Erzwingen — laufenden Turn stoppen und dies als Nächstes ausführen',
+    queueForceBlocked: 'Nicht erzwingbar vor einem wartenden Turn mit Anhängen oder solange ein verlorener Turn die Warteschlange pausiert',
     queueSend: 'Senden',
     queueDelete: 'Löschen',
     queueResume: 'Fortsetzen',

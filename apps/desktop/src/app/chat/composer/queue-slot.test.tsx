@@ -72,7 +72,7 @@ it('Delete on a server-queued card cancels its admission at the authority', asyn
   await vi.waitFor(() => expect(request).toHaveBeenCalledWith('prompt.cancel', { session_id: 'runtime-1', admission_id: 'adm-1' }))
 })
 
-it('a server-queued card shows the Steer and Edit its owner serves, and never Next (RT-35)', async () => {
+it('a server-queued card shows the Steer and Edit its owner serves, Force, and never Next (RT-35)', async () => {
   reconcilePendingSubmissions('stored', [
     { admission_id: 'adm-1', status: 'queued', user: 'later please', controls: ['steer', 'replace'] }
   ])
@@ -81,18 +81,48 @@ it('a server-queued card shows the Steer and Edit its owner serves, and never Ne
 
   await expand()
   expect(labels(rowButtons('later please')).sort()).toEqual(
-    [en.composer.queueDelete, en.composer.queueEdit, en.composer.queueSteer].sort()
+    [en.composer.queueDelete, en.composer.queueEdit, en.composer.queueForce, en.composer.queueSteer].sort()
   )
   // The local row keeps its own controls, Next included.
   expect(labels(rowButtons('local words'))).toContain(en.composer.queueSendNext)
 })
 
-it('a server-queued card from an owner without the queued-row verbs keeps only Delete', async () => {
+it('a server-queued card from an owner without the queued-row verbs keeps Delete and Force', async () => {
   reconcilePendingSubmissions('stored', [{ admission_id: 'adm-1', status: 'queued', user: 'later please' }])
   renderSlot()
   await expand()
 
-  expect(labels(rowButtons('later please'))).toEqual([en.composer.queueDelete])
+  // Force on the head needs no queued-row verb: only a Stop, which every owner serves.
+  expect(labels(rowButtons('later please')).sort()).toEqual([en.composer.queueDelete, en.composer.queueForce].sort())
+})
+
+it('Force on a server-queued card moves the rows ahead behind it, then stops the running turn', async () => {
+  reconcilePendingSubmissions('stored', [
+    { admission_id: 'adm-run', status: 'started', user: 'running', execution_generation: 5 },
+    { admission_id: 'adm-1', status: 'queued', user: 'first', controls: ['steer', 'replace'] },
+    { admission_id: 'adm-2', status: 'queued', user: 'urgent', controls: ['steer', 'replace'] }
+  ])
+
+  const request = vi.fn(async (method: string, params: Record<string, unknown>) =>
+    method === 'prompt.receipt' && params.admission_id === 'adm-run'
+      ? { admission_id: 'adm-run', status: 'started', execution_generation: 5 }
+      : { status: 'queued' }
+  )
+
+  renderSlot(request as never)
+  await expand()
+
+  fireEvent.click(rowButtons('urgent').getByRole('button', { name: en.composer.queueForce }))
+
+  await vi.waitFor(() =>
+    expect(request.mock.calls.map(([method]) => method)).toEqual([
+      'prompt.receipt',
+      'prompt.replace_queued',
+      'session.interrupt'
+    ])
+  )
+  expect(request.mock.calls[1][1]).toMatchObject({ admission_id: 'adm-1', text: 'first' })
+  expect(request.mock.calls[2][1]).toEqual({ session_id: 'runtime-1', execution_generation: 5 })
 })
 
 it('Steer on a server-queued card asks the authority to steer that admission', async () => {

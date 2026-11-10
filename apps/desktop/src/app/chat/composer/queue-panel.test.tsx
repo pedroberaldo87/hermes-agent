@@ -119,3 +119,62 @@ describe('QueuePanel lost turn', () => {
     expect(await screen.findByText('Turn lost during restart')).toBeTruthy()
   })
 })
+
+// Forçar mensagem da fila: a server row had only Edit/Steer, and a Steer can wait hours for a tool
+// boundary. Force makes the row the next turn now (rotate the rows ahead, then Stop).
+describe('QueuePanel force', () => {
+  const server = (id: string, text: string, controls = ['steer', 'replace']): QueuedPromptEntry => ({
+    ...entry(id, text),
+    serverControls: controls,
+    serverStatus: 'queued'
+  })
+
+  async function renderForce(entries: QueuedPromptEntry[], busy: boolean, onForceNow = vi.fn()) {
+    const view = render(
+      <I18nProvider configClient={{ getConfig: async () => ({}), saveConfig: async () => ({ ok: true }) }}>
+        <QueuePanel
+          busy={busy}
+          editingId={null}
+          entries={entries}
+          onDelete={vi.fn()}
+          onEdit={vi.fn()}
+          onForceNow={onForceNow}
+          onResume={vi.fn()}
+          onSendNow={vi.fn()}
+          parked={false}
+        />
+      </I18nProvider>
+    )
+
+    fireEvent.click(await view.findByRole('button', { name: /queued/i }))
+
+    return { onForceNow, view }
+  }
+
+  it('offers Force on every server row while a turn runs', async () => {
+    const { onForceNow } = await renderForce([server('a', 'first'), server('b', 'second')], true)
+    const buttons = screen.getAllByRole('button', { name: /^Force/ })
+
+    expect(buttons).toHaveLength(2)
+    fireEvent.click(buttons[1])
+    expect(onForceNow).toHaveBeenCalledWith('b')
+  })
+
+  it('has no Force while idle (the owner already runs the head) nor on a local row', async () => {
+    await renderForce([server('a', 'first')], false)
+    expect(screen.queryByRole('button', { name: /^Force/ })).toBeNull()
+    cleanup()
+    await renderForce([entry('local', 'mine')], true)
+    expect(screen.queryByRole('button', { name: /^Force/ })).toBeNull()
+  })
+
+  it('disables Force behind a row it cannot move, and says why', async () => {
+    const { onForceNow } = await renderForce([server('photo', 'with image', []), server('b', 'second')], true)
+    const [head, blocked] = screen.getAllByRole('button', { name: /^Force/ }) as HTMLButtonElement[]
+
+    expect(head.disabled).toBe(false)
+    expect(blocked.disabled).toBe(true)
+    fireEvent.click(blocked)
+    expect(onForceNow).not.toHaveBeenCalled()
+  })
+})

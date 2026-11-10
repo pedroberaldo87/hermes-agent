@@ -34,12 +34,14 @@ import {
   withQueueDrainClaim
 } from '@/store/composer-queue'
 import { activeGateway } from '@/store/gateway'
-import { notify } from '@/store/notifications'
+import { notify, notifyError } from '@/store/notifications'
 import { $selectedStoredSessionId, $sessions, $sessionsLoading } from '@/store/session'
 import { liveStoredSessionIdForQueueKey } from '@/store/session-queue-target'
+import { requestForOwnedSession } from '@/store/session-states'
 
 import { cloneAttachments, type QueueEditState } from '../composer-utils'
 import { replaceQueuedPrompt } from '../discard-lost-prompt'
+import { forceQueuedPrompt, serverRowIds, waitForNewServerRow } from '../force-queued-prompt'
 import { useComposerScope } from '../scope'
 import type { ChatBarProps } from '../types'
 
@@ -414,7 +416,7 @@ export function useComposerQueue({
 
   // `submissionId` names the restored send this draft retries: the admission (or the local entry that
   // drains under its id) keeps it, so the owner never runs the interrupted original a second time.
-  const queueCurrentDraft = useCallback((submissionId?: string) => {
+  const admitCurrentDraft = useCallback((submissionId?: string) => {
     const text = draftRef.current
 
     if (!activeQueueSessionKey || (!text.trim() && attachments.length === 0)) {
@@ -859,9 +861,63 @@ export function useComposerQueue({
     setQueueEditSnapshot(null)
   }, [activeQueueSessionKey, editingQueuedPrompt, queueEdit, setQueueEditSnapshot]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Cmd/Ctrl+Shift+Enter while a turn runs: the draft becomes the next turn NOW. It is admitted to
+  // the queue first (the owner holds the words before anything is stopped), then forced: the rows
+  // ahead move behind it and the running turn stops. Never a steer, so it cannot wait for a tool
+  // boundary or vanish on Stop.
+  const forceCurrentDraft = useCallback(async (): Promise<boolean> => {
+    const key = activeQueueSessionKey
+
+    if (!busy || !key || queueEditRef.current) {
+      return false
+    }
+
+    if (!serverOwnsComposerQueue(sessionId ?? key)) {
+      const id = randomUuid()
+
+      return (await Promise.resolve(admitCurrentDraft(id))) === true && sendQueuedNow(id) === true
+    }
+
+    const frozen = draftRef.current.trim() ? freezeQueuedDraftText(draftRef.current, t.composer) : null
+    const before = serverRowIds(key)
+
+    if ((await Promise.resolve(admitCurrentDraft())) !== true) {
+      return false
+    }
+
+    const row = frozen ? await waitForNewServerRow(key, before, frozen.frozenTransport ?? frozen.text) : null
+    const gateway = activeGateway()
+
+    if (!row || !gateway) {
+      return false
+    }
+
+    const request = gateway.request.bind(gateway)
+
+    const outcome = await forceQueuedPrompt({
+      call: (method, params) => requestForOwnedSession(key, request, method, params),
+      entries: getQueuedPrompts(key),
+      id: row.id,
+      queueSessionKey: key,
+      sessionId: sessionId ?? key
+    })
+
+    if (outcome.status === 'failed') {
+      notifyError(outcome.error, t.composer.queueForce)
+    }
+
+    return outcome.status === 'forced'
+  }, [activeQueueSessionKey, admitCurrentDraft, busy, draftRef, queueEditRef, sendQueuedNow, sessionId, t.composer])
+
+  const queueCurrentDraft = useCallback(
+    (submissionId?: string, force = false) => (force ? forceCurrentDraft() : admitCurrentDraft(submissionId)),
+    [admitCurrentDraft, forceCurrentDraft]
+  )
+
   return {
     beginQueuedEdit,
     deliverQueuedNow,
+    forceCurrentDraft,
     drainNextQueued,
     editingQueuedPrompt,
     exitQueuedEdit,

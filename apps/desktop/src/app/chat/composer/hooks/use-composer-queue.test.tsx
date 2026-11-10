@@ -664,8 +664,10 @@ describe('useComposerQueue scope', () => {
     ])
     clearNotifications()
     const replies = [deferred(), deferred(), deferred()]
+
     const replaceServerQueued = vi.fn((_admissionId: string, _text: string, _submissionId: string) =>
       replies[replaceServerQueued.mock.calls.length - 1]!.promise)
+
     const { draftRef, hook } = renderQueueHook({ busy: true, draft: 'my draft', replaceServerQueued })
 
     act(() => hook.result.current.beginQueuedEdit(getQueuedPrompts(SESSION_KEY)[0]!))
@@ -701,9 +703,11 @@ describe('useComposerQueue scope', () => {
     reconcilePendingSubmissions(SESSION_KEY, [
       { admission_id: 'adm-1', status: 'queued', user: 'old words', controls: ['steer', 'replace'] }
     ])
+
     const replaceServerQueued = vi.fn(async (_admissionId: string, _text: string, _submissionId: string) => {
       throw new Error('socket closed')
     })
+
     const { draftRef, hook } = renderQueueHook({ busy: true, replaceServerQueued })
 
     act(() => hook.result.current.beginQueuedEdit(getQueuedPrompts(SESSION_KEY)[0]!))
@@ -773,5 +777,43 @@ describe('useComposerQueue scope', () => {
     act(() => hook.result.current.beginQueuedEdit(getQueuedPrompts(SESSION_KEY)[0]!))
 
     expect(hook.result.current.queueEdit).toBeNull()
+  })
+})
+
+// Forçar mensagem da fila: Cmd/Ctrl+Shift+Enter while busy queues the draft and makes it the next
+// turn now. On a local queue that is send-next: promote to the head, then stop the running turn.
+describe('force-send (local queue)', () => {
+  afterEach(() => {
+    cleanup()
+    $queuedPromptsBySession.set({})
+    $parkedQueueSessions.set({})
+  })
+
+  it('puts the draft ahead of the queue and stops the running turn', async () => {
+    enqueueQueuedPrompt(SESSION_KEY, { text: 'first', attachments: [] })
+    const { draftRef, hook, onCancel } = renderQueueHook({ busy: true, draft: 'urgent' })
+
+    let forced: unknown
+    await act(async () => {
+      forced = await hook.result.current.queueCurrentDraft(undefined, true)
+    })
+
+    expect(forced).toBe(true)
+    expect(getQueuedPrompts(SESSION_KEY).map(entry => entry.text)).toEqual(['urgent', 'first'])
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    expect(isQueueParked(SESSION_KEY)).toBe(false)
+    expect(draftRef.current).toBe('')
+  })
+
+  it('does nothing while idle (Enter already sends)', async () => {
+    const { hook, onCancel } = renderQueueHook({ busy: false, draft: 'urgent' })
+
+    let forced: unknown
+    await act(async () => {
+      forced = await hook.result.current.queueCurrentDraft(undefined, true)
+    })
+
+    expect(forced).toBe(false)
+    expect(onCancel).not.toHaveBeenCalled()
   })
 })

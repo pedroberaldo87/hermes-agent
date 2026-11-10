@@ -968,9 +968,8 @@ export function ChatBar({
       return
     }
 
-    // Cmd/Ctrl+Enter queues a follow-up while a turn runs. Plain Enter steers
-    // a text-only draft, so both live-turn actions stay reachable by keyboard.
-    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.shiftKey) {
+    // Cmd/Ctrl+Enter queues a follow-up while a turn runs (+Shift forces it now); plain Enter steers.
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
       event.preventDefault()
 
       if (busy && !disabled) {
@@ -983,7 +982,7 @@ export function ChatBar({
           setComposerText(editorText)
         }
 
-        queueDraft()
+        queueDraft(event.shiftKey)
       }
 
       return

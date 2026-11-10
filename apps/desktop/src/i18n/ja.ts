@@ -2462,6 +2462,8 @@ export const jaOverrides = {
     queueCollapse: '折りたたむ',
     queueSendNext: '次に送信',
     queueSteer: 'ステア — 現在のターンを今すぐ修正',
+    queueForce: '強制 — 現在のターンを止めて次にこれを実行',
+    queueForceBlocked: '添付付きの待機ターンを越えて、または失われたターンでキューが停止中は強制できません',
     queueSend: '送信',
     queueDelete: '削除',
     queueLostNote: '再起動中にターンが失われました',

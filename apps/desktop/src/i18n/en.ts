@@ -3501,6 +3501,8 @@ export const en: Translations = {
     queueCollapse: 'Collapse',
     queueSendNext: 'Next',
     queueSteer: 'Steer — redirect the live turn now',
+    queueForce: 'Force — stop the live turn and run this next',
+    queueForceBlocked: 'Can’t force past a queued turn with attachments, or while a lost turn pauses the queue',
     queueSend: 'Send',
     queueDelete: 'Delete',
     queueLostNote: 'Turn lost during restart',

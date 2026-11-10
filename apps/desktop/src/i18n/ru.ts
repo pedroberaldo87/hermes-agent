@@ -2726,6 +2726,8 @@ export const ruOverrides = {
     queueCollapse: 'Свернуть',
     queueSendNext: 'Дальше',
     queueSteer: 'Направить — изменить текущий ход сейчас',
+    queueForce: 'Принудительно — остановить текущий ход и выполнить это следующим',
+    queueForceBlocked: 'Нельзя обойти ход в очереди с вложениями или пока потерянный ход приостановил очередь',
     queueSend: 'Отправить',
     queueDelete: 'Удалить',
     queueLostNote: 'Ход потерян при перезапуске',
