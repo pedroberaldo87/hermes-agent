@@ -66,6 +66,13 @@ def build_update_parser(subparsers, *, cmd_update: Callable) -> None:
             "under the default strategy (switch), which already switches. "
             "Still refuses to touch a dirty tree.")
     update_parser.add_argument(
+        "--no-pull", action="store_true", default=False,
+        help="Install the commit already checked out: no fetch, no merge/pull, no branch switch "
+            "and no updates.parked_branch_strategy. Everything after the code step still runs "
+            "(dependencies, plugins, migrations, Desktop rebuild, gateway restart); the receipt "
+            "records pulled: false. For deploy tools that check out a validated commit first. "
+            "Cannot be combined with --branch, --channel or --switch-branch.")
+    update_parser.add_argument(
         "--force", action="store_true", default=False,
         help="Windows: proceed with the update even when another hermes.exe is detected. The concurrent process will likely cause WinError 32 warnings. Does NOT bypass the venv-process guard (see --force-venv).",
     )

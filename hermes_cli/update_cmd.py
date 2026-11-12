@@ -33,6 +33,7 @@ from hermes_cli import update_cmd_commit as _commit
 from hermes_cli import update_cmd_posix_pause as _posix_pause
 from hermes_cli.update_cmd_pause_gate import _checkout_move, _moves_for
 from hermes_cli import update_cmd_check as _check
+from hermes_cli import update_cmd_no_pull as _no_pull
 
 # Re-exports: every split-module name stays reachable (and monkeypatchable) as update_cmd.<name>.
 from hermes_cli.update_abort_recovery import (
@@ -1807,6 +1808,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
         print(f"  (removed {lock} left by a git that was killed)")
     _check.clear_git_debris(_m().PROJECT_ROOT)
 
+    _no_pull.refuse_conflicting_flags(args)
     opts = _resolve_update_options(args, gateway_mode)
     gw_input_fn, assume_yes = opts.gw_input_fn, opts.assume_yes
 
@@ -1843,7 +1845,8 @@ def _cmd_update_impl(args, gateway_mode: bool):
         had_desktop_app_before_update, gateway_mode)
     branch = _m()._resolve_update_branch(args)
     completion_request["branch"] = branch
-    target_ref, release_sha, target_is_head, target_repository = _check.select_apply_target(
+    # --no-pull: HEAD is the target (target_is_head), so nothing below fetches, merges or switches.
+    target_ref, release_sha, target_is_head, target_repository = _no_pull.select_apply_target(
         args, branch, completion_request, git_cmd=None if use_zip_update else git_cmd,
         stop=lambda: _m()._resume_windows_gateways_after_update(_windows_gateway_resume))
     branch = completion_request["branch"]
