@@ -83,7 +83,7 @@ def _visible_once(tui: TmuxTui, needles: list[str]) -> str:
 def _scenario(root, victim) -> object:
     command = f"for i in $(seq -w 1 {len(TOOL_LINES)}); do echo tout$i; sleep 0.3; done"
     script = [
-        ToolCall("clarify", {"questions": [{"question": QUESTION, "choices": ["red", "blue"]}]}), Text(REPLIES["c1"]),
+        ToolCall("clarify", {"context": "Pick one.", "questions": [{"question": QUESTION, "choices": ["red", "blue"]}]}), Text(REPLIES["c1"]),
         ToolCall("terminal", {"command": f"rm -rf {victim}"}), Text(REPLIES["a1"]),
         ToolCall("terminal", {"command": command}), Text(REPLIES["t1"]),
     ]

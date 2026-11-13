@@ -33,7 +33,7 @@ class ModelPeer(BaseHTTPRequestHandler):
         if asking:
             message = {'role': 'assistant', 'content': None, 'tool_calls': [{
                 'index': 0, 'id': 'owned-clarify', 'type': 'function', 'function': {
-                    'name': 'clarify', 'arguments': json.dumps({'questions': [
+                    'name': 'clarify', 'arguments': json.dumps({'context': 'Context.', 'questions': [
                         {'question': 'Pick a color', 'choices': ['blue', 'green']},
                         {'question': 'Pick a size'}]})}}]}
         self.send_response(200)
@@ -98,6 +98,7 @@ async def probe(peer):
         request = await server_request(b, 'clarify')
         rid, questions = request['id'], request['params']['questions']
         assert [q['question'] for q in questions] == ['Pick a color', 'Pick a size'], questions
+        assert request['params'].get('context') == 'Context.', request['params']
         first = await rpc(b, 3, 'clarify.lock', request_id=rid, question_id=questions[0]['qid'], answer='green')
         assert first.get('result', {}).get('remaining') == [questions[1]['qid']], first
         last = await rpc(b, 4, 'clarify.lock', request_id=rid, question_id=questions[1]['qid'], answer='large')

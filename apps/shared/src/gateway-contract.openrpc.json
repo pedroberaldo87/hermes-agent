@@ -9851,6 +9851,18 @@
             "default": null,
             "title": "Multi Select"
           },
+          "context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Context"
+          },
           "timeout_s": {
             "anyOf": [
               {
@@ -12459,7 +12471,7 @@
       },
       "ClarifyRequestParams": {
         "additionalProperties": false,
-        "description": "``answers`` rides only on a reconnect replay (locks the server already accepted; null = skipped).",
+        "description": "``answers`` rides only on a reconnect replay (locks the server already accepted; null = skipped).\n``context``: the clarify call's explanation, shown above the questions (markdown).",
         "properties": {
           "session_id": {
             "title": "Session Id",
@@ -12493,6 +12505,18 @@
             ],
             "default": null,
             "title": "Answers"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Context"
           }
         },
         "required": [

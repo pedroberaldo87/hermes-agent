@@ -36,7 +36,7 @@ export interface ClientLocalGatewayEventMap {
    *  / `clarify.respond`. Not part of the generated `tui_gateway` contract. */
   'approval.request': CanonicalPromptEvent & { command?: string; description?: string; choices?: string[]; edit?: unknown }
   'approval.settled': CanonicalPromptEvent
-  'clarify.request': CanonicalPromptEvent & { question?: string; choices?: string[]; multi_select?: boolean }
+  'clarify.request': CanonicalPromptEvent & { question?: string; choices?: string[]; multi_select?: boolean; context?: string }
   'clarify.settled': CanonicalPromptEvent
   'dashboard.new_session_requested': { reason?: string }
   'gateway.protocol_error': { preview?: string }

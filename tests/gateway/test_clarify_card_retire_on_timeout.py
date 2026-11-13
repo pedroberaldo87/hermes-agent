@@ -88,7 +88,7 @@ def _run_clarify(adapter, questions=_ONE_QUESTION, answers=(), via_tool=False):
             patch("tools.clarify_gateway.get_clarify_timeout", return_value=0.05):
         if via_tool:
             from tools.clarify_tool import clarify_tool
-            return clarify_tool(questions, callback=runner._clarify_callback_sync), labels
+            return clarify_tool(questions, context="Context.", callback=runner._clarify_callback_sync), labels
         return runner._clarify_callback_sync(questions), labels
 
 

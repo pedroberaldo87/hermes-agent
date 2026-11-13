@@ -94,7 +94,7 @@ class TestClarify:
         def callback(normalized):
             return {"answers": {normalized[0]["qid"]: PASSWORD}, "outcome": outcome}
 
-        clarify_tool(self.QUESTIONS, callback=callback)
+        clarify_tool(self.QUESTIONS, context="Context.", callback=callback)
 
         request, resolved = _single_pair(captured, "clarify")
         assert resolved["outcome"] == outcome
@@ -105,7 +105,7 @@ class TestClarify:
         def callback(normalized):
             raise RuntimeError("ui gone")
 
-        clarify_tool(self.QUESTIONS, callback=callback)
+        clarify_tool(self.QUESTIONS, context="Context.", callback=callback)
 
         assert _single_pair(captured, "clarify")[1]["outcome"] == "error"
 
