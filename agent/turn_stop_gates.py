@@ -166,7 +166,9 @@ def apply_stop_gates(
             agent, final_msg, messages, conversation_history, "late-LSP interim flush failed"
         )
         # A durable row (no scaffolding flag): it is never stripped, so no sent byte changes later.
-        append_message(messages, {"role": "user", "content": _lsp_note})
+        # Typed ``hidden`` because Hermes wrote it, not the user: display_kind never reaches the wire,
+        # and every human view (transcripts, turn receipts, memory sync) skips the row.
+        append_message(messages, {"role": "user", "content": _lsp_note, "display_kind": "hidden"})
         agent._session_messages = messages
         logger.debug("late LSP verdicts delivered before the final answer (%d)", agent._lsp_turn_end_notes)
         return StopGateVerdict(
