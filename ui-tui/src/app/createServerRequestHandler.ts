@@ -98,7 +98,9 @@ export function createServerRequestHandler(ctx: ServerRequestHandlerContext): (r
               )
             : {}
 
-        patchOverlayState({ clarify: { answers, questions, requestId: request.id } })
+        const context = str(p.context).trim() || undefined
+
+        patchOverlayState({ clarify: { answers, context, questions, requestId: request.id } })
         open(request, t('session.status.waitingForInput'))
 
         return true

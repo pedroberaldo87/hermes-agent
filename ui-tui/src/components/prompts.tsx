@@ -376,6 +376,14 @@ export function ClarifyPrompt({ cols = 80, onCancel, onQuestionAnswer, req, t }:
 
   return (
     <Box flexDirection="column">
+      {req.context ? (
+        // The clarify call's explanation: the text the user decides on, above the questions.
+        <Box marginBottom={1}>
+          <Text color={t.color.text} wrap="wrap">
+            {req.context}
+          </Text>
+        </Box>
+      ) : null}
       <Text bold>
         <Text color={t.color.accent}>ask</Text>
         <Text color={t.color.text}>

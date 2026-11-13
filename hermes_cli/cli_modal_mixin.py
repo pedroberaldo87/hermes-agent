@@ -997,7 +997,10 @@ class CLIModalMixin:
         from cli import CLI_CONFIG, _DIM, _RST, _cprint
         from tools.clarify_gateway import resolve_clarify_timeout
 
+        from tools.clarify_tool import clarify_call_context
         timeout = resolve_clarify_timeout(CLI_CONFIG)
+        if context := clarify_call_context(questions):
+            _cprint(f"\n{context}\n")  # the clarify call's explanation, above its questions
         response_queue = queue.Queue()
         state = {
             "questions": list(questions),
