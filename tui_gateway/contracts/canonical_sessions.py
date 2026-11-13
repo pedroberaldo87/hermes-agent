@@ -116,6 +116,8 @@ class CanonicalPendingPrompt(Result):
     edit: dict[str, JsonValue] | None = None
     question: str | None = None
     multi_select: bool | None = None
+    # Clarify: the call's explanation (markdown), on the batch's first card only.
+    context: str | None = None
     # Local viewer turns: the seconds the gateway waits before it gives up on this prompt.
     timeout_s: int | None = None
 

@@ -10,8 +10,11 @@ from tools.clarify_tool import (
 )
 
 
+CONTEXT = "Context the user reads above the questions."
+
+
 def _ask(callback, questions):
-    return json.loads(clarify_tool(questions, callback=callback))
+    return json.loads(clarify_tool(questions, context=CONTEXT, callback=callback))
 
 
 def _reply(answers, outcome="submitted", **extra):
@@ -38,7 +41,7 @@ class TestClarifyToolBasics:
 
     def test_no_callback_returns_error(self):
         """Should return error when no callback is provided."""
-        result = json.loads(clarify_tool([{"question": "What do you want?"}]))
+        result = json.loads(clarify_tool([{"question": "What do you want?"}], context=CONTEXT))
         assert "error" in result
         assert "responses" not in result
 
@@ -89,7 +92,7 @@ class TestClarifySchema:
         is a one-entry array) and carries the batch cap so the model sees the
         limit."""
         params = CLARIFY_SCHEMA["parameters"]
-        assert params["required"] == ["questions"]
+        assert params["required"] == ["context", "questions"]
         assert params["properties"]["questions"]["maxItems"] == MAX_QUESTIONS
 
 
@@ -211,7 +214,7 @@ class TestRegistryMultiSelectPassThrough:
             return _reply({"q0": ["a", "b"]})
 
         result = json.loads(entry.handler(
-            {"questions": [{"question": "Pick", "choices": ["a", "b"], "multi_select": True}]},
+            {"context": CONTEXT, "questions": [{"question": "Pick", "choices": ["a", "b"], "multi_select": True}]},
             callback=cb,
         ))
         assert seen["multi"] is True
@@ -227,7 +230,7 @@ class TestRegistryMultiSelectPassThrough:
             return _reply({"q0": "a"})
 
         result = json.loads(entry.handler(
-            {"questions": [{"question": "Pick", "choices": ["a", "b"]}]},
+            {"context": CONTEXT, "questions": [{"question": "Pick", "choices": ["a", "b"]}]},
             callback=cb,
         ))
         assert seen["multi"] is False
@@ -379,7 +382,7 @@ class TestRegistryBatchPassThrough:
             return _reply({"q0": "yes"})
 
         result = json.loads(entry.handler(
-            {"questions": [{"question": "Go?"}]},
+            {"context": CONTEXT, "questions": [{"question": "Go?"}]},
             callback=cb,
         ))
         assert seen["questions"][0]["question"] == "Go?"

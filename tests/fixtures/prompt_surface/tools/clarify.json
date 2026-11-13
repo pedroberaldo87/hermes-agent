@@ -3,6 +3,10 @@
   "name": "clarify",
   "parameters": {
     "properties": {
+      "context": {
+        "description": "Required. The COMPLETE message the user reads above the buttons. It is the ONLY text the user sees for this question: your thinking and anything you wrote earlier in this turn are NOT shown. Put the full result, findings and every numbered item here (markdown ok), not a pointer like 'items above'.",
+        "type": "string"
+      },
       "questions": {
         "description": "The question(s). Each: question text (options excluded), optional choices (recommended first; omit for free-text), optional multi_select. Responses come back in question order with the question text echoed.",
         "items": {
@@ -32,6 +36,7 @@
       }
     },
     "required": [
+      "context",
       "questions"
     ],
     "type": "object"

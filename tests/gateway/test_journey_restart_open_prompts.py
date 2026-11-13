@@ -48,7 +48,7 @@ class PromptModel(BaseHTTPRequestHandler):
         message = {'role': 'assistant', 'content': 'ACK_' + str(text)}
         if last.get('role') == 'user' and text in ASK.values():
             name, args = ('terminal', {'command': self.server.command}) if text == ASK['approval'] else (
-                'clarify', {'questions': [{'question': 'Pick a color', 'choices': ['BLUE', 'GREEN']}]})
+                'clarify', {'context': 'Context.', 'questions': [{'question': 'Pick a color', 'choices': ['BLUE', 'GREEN']}]})
             message = {'role': 'assistant', 'content': None, 'tool_calls': [{
                 'index': 0, 'id': 'call_' + name, 'type': 'function',
                 'function': {'name': name, 'arguments': json.dumps(args)}}]}

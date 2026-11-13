@@ -14,6 +14,32 @@ MAX_CHOICE_CHARS = 8000
 RECOMMENDED_LABEL = "(Recommended)"
 _UNAVAILABLE = "Clarify tool is not available in this execution context."
 _SHAPE = "Pass questions=[{question, choices?, multi_select?}]; a single question is a one-entry array."
+# Claude models that call clarify after other tools in the same turn write the explanation into a
+# thinking block, which the user never sees (0/68 runs produced a text block); a required ``context``
+# whose description says it is the only text shown got the full report 13/13 (2026-11-12 probe).
+CONTEXT_DESCRIPTION = (
+    "Required. The COMPLETE message the user reads above the buttons. It is the ONLY text the user sees for "
+    "this question: your thinking and anything you wrote earlier in this turn are NOT shown. Put the full "
+    "result, findings and every numbered item here (markdown ok), not a pointer like 'items above'.")
+_CONTEXT_REQUIRED = (
+    "clarify refused: `context` is missing or empty. The user sees ONLY `context` above the buttons; your "
+    "thinking and earlier text in this turn are not shown. Call clarify again with the full explanation "
+    "in `context` (findings, proposal, every numbered item; markdown ok), then the questions.")
+
+
+class ClarifyQuestions(list):
+    """The display copy of a clarify batch handed to a surface callback: a plain list of question
+    entries (callbacks that ignore the explanation keep working) carrying ``context``, the text the
+    surface shows above the questions. Read it with ``clarify_call_context``."""
+
+    def __init__(self, entries=(), context: str = ""):
+        super().__init__(entries)
+        self.context = context
+
+
+def clarify_call_context(questions) -> str:
+    """The explanation a clarify batch carries (``""`` for a plain list)."""
+    return str(getattr(questions, "context", "") or "")
 
 
 def mark_recommended(choices: list[str]) -> list[str]:
@@ -112,12 +138,17 @@ def _result(normalized: list[dict], reply: dict, shown: list[dict] | None = None
     return json.dumps(result, ensure_ascii=False)
 
 
-def clarify_tool(questions, callback: Optional[Callable] = None) -> str:
+def clarify_tool(questions, context=None, callback: Optional[Callable] = None) -> str:
     """Ask 1-5 questions in one call. ``callback(questions) -> {"answers", "outcome", "notice"?}``
-    is platform injected (cli.py / gateway / tui_gateway) and receives the normalized list."""
+    is platform injected (cli.py / gateway / tui_gateway) and receives the normalized list as a
+    ``ClarifyQuestions`` carrying ``context`` (stripped, never truncated: messaging surfaces send it
+    through their normal reply path, which splits long text)."""
     normalized, error = _normalize_questions(questions)
     if error:
         return tool_error(error)
+    context = context.strip() if isinstance(context, str) else ""
+    if not context:
+        return tool_error(_CONTEXT_REQUIRED)
     if callback is None:
         return tool_error(_UNAVAILABLE)
     from agent.redact import redact_approval_display
@@ -140,6 +171,7 @@ def clarify_tool(questions, callback: Optional[Callable] = None) -> str:
         offered = prose(q["choices_offered"])
         shown.append({**q, "question": prose([q["question"]])[0], "choices_offered": offered,
                       "choices": mark_recommended(list(offered)) if offered else None})
+    shown = ClarifyQuestions(shown, context=redact_approval_display(context, prose=True))
     # Observers see the questions only; the answers stay in the tool result.
     with human_input_request("clarify", prompt="\n".join(q["question"] for q in shown)) as human:
         try:
@@ -182,6 +214,7 @@ CLARIFY_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
+            "context": {"type": "string", "description": CONTEXT_DESCRIPTION},
             "questions": {
                 "type": "array",
                 "minItems": 1,
@@ -207,7 +240,7 @@ CLARIFY_SCHEMA = {
                 },
             },
         },
-        "required": ["questions"],
+        "required": ["context", "questions"],
     },
 }
 
@@ -218,8 +251,8 @@ registry.register(
     name="clarify",
     toolset="clarify",
     schema=CLARIFY_SCHEMA,
-    handler=lambda args, **kw: clarify_tool(args.get("questions"), callback=kw.get("callback")),
+    handler=lambda args, **kw: clarify_tool(args.get("questions"), args.get("context"), callback=kw.get("callback")),
     check_fn=check_clarify_requirements,
     emoji="❓",
-    self_checked_args=("questions",),
+    self_checked_args=("questions", "context"),  # the handler's refusal says what belongs in context
 )

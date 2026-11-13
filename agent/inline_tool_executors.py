@@ -306,7 +306,7 @@ _RAW_INLINE_TOOL_EXECUTORS: dict[str, InlineToolExecutor] = {
     "session_search": _session_search,
     "memory": _memory,
     "clarify": _tool(
-        "tools.clarify_tool", "clarify_tool", ("questions", "questions"),
+        "tools.clarify_tool", "clarify_tool", ("questions", "questions"), ("context", "context", ""),
         callback=lambda agent, ctx: agent.clarify_callback,
     ),
     "read_terminal": _callback_tool(

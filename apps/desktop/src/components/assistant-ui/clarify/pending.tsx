@@ -20,6 +20,7 @@ import { notifyError } from '@/store/notifications'
 import { forgetServerRequest } from '@/store/server-requests'
 import { requestForOwnedSession } from '@/store/session-states'
 
+import { ClarifyContext } from './context'
 import { ClarifyConfirmBar } from './core/confirm-bar'
 import { emptyStage, QuestionBlock } from './core/question-block'
 import { CLARIFY_ICON_CLASS, ClarifyShell } from './core/shell'
@@ -308,6 +309,7 @@ export function ClarifyToolPending({
           {copy.loadingQuestion}
         </span>
       )}
+      <ClarifyContext text={fromArgs?.context} />
       <ClarifyShell className="grid gap-3">
         <div className="flex items-start gap-2">
           <span className="flex-1 text-[0.6875rem] leading-4 text-(--ui-text-tertiary)">

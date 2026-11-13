@@ -41,10 +41,12 @@ class ClarifyQuestion(Params):
 
 
 class ClarifyRequestParams(ServerRequestParams):
-    """``answers`` rides only on a reconnect replay (locks the server already accepted; null = skipped)."""
+    """``answers`` rides only on a reconnect replay (locks the server already accepted; null = skipped).
+    ``context``: the clarify call's explanation, shown above the questions (markdown)."""
 
     questions: list[ClarifyQuestion]
     answers: dict[str, str | None] | None = None
+    context: str | None = None
 
 
 class ClarifyResult(Result):

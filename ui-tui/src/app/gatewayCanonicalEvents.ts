@@ -120,7 +120,13 @@ export function openCanonicalClarify(
   }
 
   patchOverlayState({
-    clarify: { answers: shared.answers ?? {}, questions, requestId: shared.prompt_id, sharedControl }
+    clarify: {
+      answers: shared.answers ?? {},
+      context: shared.context?.trim() || undefined,
+      questions,
+      requestId: shared.prompt_id,
+      sharedControl
+    }
   })
   setStatus('waiting for input…')
   ringPromptBell()

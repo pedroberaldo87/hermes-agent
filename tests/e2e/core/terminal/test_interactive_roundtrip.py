@@ -66,7 +66,8 @@ class Script:
                 self.tool_results.setdefault(tag, []).append(str(last.get("content") or ""))
             return Text(f"DONE {tag}")
         if kind == "CLARIFY":
-            return ToolCall("clarify", {"questions": [{"question": f"Which colour for {tag}?", "choices": ["red", "blue"]}]})
+            return ToolCall("clarify", {"context": f"Colour pick for {tag}.",
+                                        "questions": [{"question": f"Which colour for {tag}?", "choices": ["red", "blue"]}]})
         return ToolCall("terminal", {"command": f"rm -rf {self.victims[tag]}"})
 
 

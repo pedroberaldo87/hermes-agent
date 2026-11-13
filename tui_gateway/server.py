@@ -984,10 +984,12 @@ def _clarify_block(sid: str, questions: list[dict]) -> dict:
     """Bridge the clarify tool callback onto one ``clarify`` server request carrying only the wire fields
     (tool-side entries carry result-assembly keys too). Answers lock one at a time through ``clarify.lock``
     (``null`` = skipped); the tool gets ``{"answers", "outcome"}`` — ``undelivered`` when no client took it."""
+    from tools.clarify_tool import clarify_call_context
     from tui_gateway import server_requests
     wire = [{"qid": e["qid"], "question": e["question"], "choices": e["choices"], "multi_select": bool(e["multi_select"])}
             for e in questions]
-    result = server_requests.send("clarify", sid, {"questions": wire}, timeout=_clarify_timeout_seconds(),
+    params = {"questions": wire, **({"context": c} if (c := clarify_call_context(questions)) else {})}
+    result = server_requests.send("clarify", sid, params, timeout=_clarify_timeout_seconds(),
                                   qids=[e["qid"] for e in questions])
     return result or {"answers": {}, "outcome": "undelivered"}
 

@@ -5213,6 +5213,7 @@ export interface CanonicalPendingPrompt {
   edit?: Record<string, unknown> | null
   question?: string | null
   multi_select?: boolean | null
+  context?: string | null
   timeout_s?: number | null
 }
 export interface CanonicalSnapshotInfo {
@@ -5594,11 +5595,12 @@ export interface PluginRpcParams {
   session_id?: string | null
   [key: string]: unknown
 }
-/** ``answers`` rides only on a reconnect replay (locks the server already accepted; null = skipped). */
+/** ``answers`` rides only on a reconnect replay (locks the server already accepted; null = skipped). ``context``: the clarify call's explanation, shown above the questions (markdown). */
 export interface ClarifyRequestParams {
   session_id: string
   questions: ClarifyQuestion[]
   answers?: Record<string, string | null> | null
+  context?: string | null
 }
 export interface ClarifyQuestion {
   qid: string

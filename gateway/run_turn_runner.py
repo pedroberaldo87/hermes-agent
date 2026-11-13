@@ -664,10 +664,12 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         # viewer (TUI / Desktop / CLI) renders main's modal with its own skip control, unhinted.
         platform = getattr(getattr(self._ctx, "source", None), "platform", None)
         hint = "" if platform == Platform.LOCAL else f"\n{t('gateway.clarify.skip_hint')}"
+        from tools.clarify_tool import clarify_call_context
         for index, entry in enumerate(questions):
             question = f"{entry['question']}{hint}"
             raw, answered = self._ask_clarify_question(
-                question, entry["choices"], bool(entry["multi_select"]), rearm=index == last)
+                question, entry["choices"], bool(entry["multi_select"]), rearm=index == last,
+                context=clarify_call_context(questions) if index == 0 else "")
             if raw == CANCELLED:
                 reply["outcome"] = "cancelled"
                 break
@@ -681,11 +683,13 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
             answers[entry["qid"]] = None if raw == SKIPPED else raw
         return reply
 
-    def _ask_clarify_question(self, question, choices, multi_select, rearm: bool = True) -> tuple[str, bool]:
+    def _ask_clarify_question(self, question, choices, multi_select, rearm: bool = True,
+                              context: str = "") -> tuple[str, bool]:
         """One card: register, send, wait, then retire it (no answer) or re-arm (answer).
+        ``context`` (the batch's explanation, first card only) goes out right before the card.
         Returns ``(response, answered)``; the caller decides what "no answer" means."""
         from gateway.run_turn_runner_clarify_delivery import (
-            UNDELIVERED_NO_SURFACE, _clarify_send_then_wait, text_fallback_coro)
+            UNDELIVERED_NO_SURFACE, _clarify_send_then_wait, send_clarify_call_context, text_fallback_coro)
         from tools import clarify_gateway as clarify_mod
         import uuid
         ctx = self._ctx
@@ -707,7 +711,7 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
             return None if coro is None else self._schedule(coro, "Clarify text fallback failed to schedule")
         entry = clarify_mod.register(
             clarify_id=clarify_id, session_key=session_key, question=question, choices=choices,
-            multi_select=bool(multi_select),
+            multi_select=bool(multi_select), context=context,
         )
         # Unlike approval, clarify passes reopen=True so the continuation re-opens a native stream
         # below the question; if the re-seed fails the consumer degrades to send() automatically.
@@ -725,6 +729,7 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
                 flush(timeout=3.0)
         except Exception:
             logger.debug("Stream-consumer flush before clarify prompt failed", exc_info=True)
+        send_clarify_call_context(self, context)  # after the flushed prose, before the buttons
         fut = self._schedule(
             self._send_shared_clarify(entry, **send_kwargs),
             "Clarify send failed to schedule",

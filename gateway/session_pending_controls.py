@@ -45,6 +45,8 @@ class PendingControls:
                       "question": _redact_approval_command(entry.question),
                       "choices": [_redact_approval_command(c) for c in entry.choices or []],
                       "multi_select": entry.multi_select}
+            if getattr(entry, "context", ""):
+                prompt["context"] = _redact_approval_command(entry.context)
             if timeout_s is not None:
                 prompt["timeout_s"] = timeout_s
             self.pending[entry.clarify_id] = (entry, prompt)

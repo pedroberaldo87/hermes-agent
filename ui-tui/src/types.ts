@@ -129,6 +129,8 @@ export interface ClarifyReq {
   sharedControl?: SharedControl
   requestId: string
   questions: ClarifyQuestion[]
+  /** The clarify call's explanation, shown above the questions. */
+  context?: string
   /** Answers already locked server-side (qid → answer): seeded from the
    *  reconnect replay, updated as the user locks each question. */
   answers?: Record<string, string>

@@ -257,6 +257,24 @@ def clarify_context_sink(runner) -> Optional[Callable[..., None]]:
     return send
 
 
+def send_clarify_call_context(runner, context: str) -> None:
+    """The clarify call's ``context`` (its explanation) on a messaging platform: a normal message
+    through the adapter's own ``send`` (the formatter and splitting every reply gets, so markdown
+    renders and a long report is split, not cut), sent before the buttons. A separate message rather
+    than the card's text: the card path escapes its question as plain text and a card has one
+    message's length. Same budget and ordering barrier as ``clarify_context_sink``. Local viewers
+    (TUI/Desktop) render the tool call's own ``context``; nothing is sent for them. A failure here is
+    logged and the card still goes: the user must always get the question the turn waits on."""
+    if not context:
+        return
+    try:
+        send = clarify_context_sink(runner)
+        if send is not None:
+            send(context)
+    except Exception:
+        logger.warning("Clarify context could not be sent before the prompt", exc_info=True)
+
+
 async def await_clarify_context(runner) -> None:
     """Hold the clarify card until its explanation's send has finished, within what is left of the
     explanation's ``SEND_ACK_WINDOW`` budget (the agent thread already spent part of it). The card path

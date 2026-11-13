@@ -61,6 +61,8 @@ export interface CanonicalApprovalPrompt extends CanonicalSharedPrompt {
 export interface CanonicalClarifyPrompt extends CanonicalSharedPrompt {
   answers?: Record<string, string>
   choices?: null | string[]
+  /** The clarify call's explanation, shown above the questions. */
+  context?: string
   multi_select?: boolean
   question?: string
   questions?: Array<{ choices?: null | string[]; multi_select?: boolean; qid: string; question: string }>

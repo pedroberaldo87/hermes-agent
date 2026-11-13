@@ -95,7 +95,7 @@ def test_first_render_surfaces_get_the_display_copy_while_values_stay_raw(monkey
     # surfaced); the tool result echoes the raw question and maps the picked choice back to its raw text.
     prose = "\u26a0\ufe0f Which branch? \U0001f468\u200d\U0001f4bb \u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645"
     asked = []
-    result = json.loads(clarify_tool([{"question": prose + raw, "choices": ["go\u202edab", "ok"]}],
+    result = json.loads(clarify_tool([{"question": prose + raw, "choices": ["go\u202edab", "ok"]}], context="Context.",
                                      callback=lambda qs: asked.extend(qs) or {
                                          "answers": {qs[0]["qid"]: qs[0]["choices"][0]}, "outcome": "submitted"}))
     assert asked[0]["question"] == prose + "rm -rf ./build\u200b-cache\u27e8\\u2028 \u00d760\u27e9; " + _TAIL
@@ -103,7 +103,7 @@ def test_first_render_surfaces_get_the_display_copy_while_values_stay_raw(monkey
     assert result["responses"][0]["question"] == prose + raw and result["responses"][0]["user_response"] == "go\u202edab"
     # Choices that display alike (a literal "\\u202e" beside a real U+202E) stay distinct, so each pick maps back to its own raw.
     twins = ["go\u202edab", "go\\u202edab"]
-    result = json.loads(clarify_tool([{"question": "which?", "choices": twins}], callback=lambda qs: asked.append(qs[0]) or {
+    result = json.loads(clarify_tool([{"question": "which?", "choices": twins}], context="Context.", callback=lambda qs: asked.append(qs[0]) or {
         "answers": {qs[0]["qid"]: qs[0]["choices_offered"][1]}, "outcome": "submitted"}))
     assert asked[-1]["choices_offered"] == ["go\\u202edab", "go\\u202edab (2)"]
     assert result["responses"][0]["user_response"] == twins[1]

@@ -1126,9 +1126,11 @@ class GatewayAgent:
         answer = ""
         if self.clarify_callback is not None:
             qid = payload.get("prompt_id") or "q0"
-            reply = self.clarify_callback([{"qid": qid, "question": payload.get("question") or "",
-                                            "choices": list(payload.get("choices") or []),
-                                            "multi_select": bool(payload.get("multi_select"))}])
+            from tools.clarify_tool import ClarifyQuestions
+            reply = self.clarify_callback(ClarifyQuestions([{"qid": qid, "question": payload.get("question") or "",
+                                                             "choices": list(payload.get("choices") or []),
+                                                             "multi_select": bool(payload.get("multi_select"))}],
+                                                           context=str(payload.get("context") or "")))
             if isinstance(reply, dict):
                 value = (reply.get("answers") or {}).get(qid)
                 answer = ", ".join(map(str, value)) if isinstance(value, (list, tuple)) else (value or "")
@@ -1475,7 +1477,8 @@ def clarify_reply(callback, params) -> dict:
                  for q in params.get("questions") or [] if isinstance(q, dict) and q.get("qid")]
     if callback is None or not questions:
         return {"outcome": "cancelled"}
-    reply = callback(questions)
+    from tools.clarify_tool import ClarifyQuestions
+    reply = callback(ClarifyQuestions(questions, context=str(params.get("context") or "")))
     if not isinstance(reply, dict):
         return {"outcome": "cancelled"}
     answers = {qid: (value if isinstance(value, str) or value is None else json.dumps(value))

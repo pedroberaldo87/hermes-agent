@@ -7,8 +7,9 @@ import { useI18n } from '@/i18n'
 import { CircleLetterA, MessageQuestion } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 
+import { ClarifyContext } from './context'
 import { ClarifyLine, ClarifyShell } from './core/shell'
-import { readClarifyResult } from './parse'
+import { readClarifyArgs, readClarifyResult } from './parse'
 
 /** Settled batch card: every question with its locked (or absent) answer. */
 export function ClarifyToolSettled(props: ToolCallMessagePartProps) {
@@ -23,7 +24,9 @@ export function ClarifyToolSettled(props: ToolCallMessagePartProps) {
     return <ToolFallback {...props} />
   }
 
-  return (
+  const context = readClarifyArgs(props.args).context
+
+  const card = (
     <ClarifyShell className="my-1.5 grid gap-2.5" data-clarify-settled="">
       {responses.map((row, index) => {
         const answer = Array.isArray(row.answer) ? row.answer.join(', ') : (row.answer ?? '')
@@ -53,5 +56,15 @@ export function ClarifyToolSettled(props: ToolCallMessagePartProps) {
         )
       })}
     </ClarifyShell>
+  )
+
+  // The explanation stays above its answered questions in the transcript.
+  return context ? (
+    <div className="grid gap-1.5">
+      <ClarifyContext text={context} />
+      {card}
+    </div>
+  ) : (
+    card
   )
 }

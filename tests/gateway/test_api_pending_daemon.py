@@ -30,7 +30,7 @@ class PromptPeer(BaseHTTPRequestHandler):
             name = 'terminal' if approval else 'clarify'
             # Git Bash eats unquoted backslashes: a bare C:\\... path removes nothing on Windows.
             args = {'command': 'rm -rf ' + shlex.quote(self.server.target.as_posix())} if approval else {
-                'questions': [{'question': 'Choose the answer', 'choices': ['BLUE', 'GREEN']}]}
+                'context': 'Context.', 'questions': [{'question': 'Choose the answer', 'choices': ['BLUE', 'GREEN']}]}
             message = {'role': 'assistant', 'content': None, 'tool_calls': [{
                 'id': 'call_control', 'type': 'function', 'function': {'name': name, 'arguments': json.dumps(args)}}]}
         finish = 'tool_calls' if 'tool_calls' in message else 'stop'

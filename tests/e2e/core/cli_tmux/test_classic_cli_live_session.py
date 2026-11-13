@@ -70,7 +70,7 @@ def _main(record: dict[str, Any]):
         "LIVE04": lambda: ToolCall("write_file", {"path": "made_by_agent.txt", "content": "written through the gateway\n"}),
         "LIVE05": lambda: ToolCall("search_files", {"pattern": "fixture", "path": "."}),
         "LIVE07": lambda: ToolCall("memory", {"action": "add", "target": "memory", "content": "LIVE07 fact: likes tea"}),
-        "LIVE08": lambda: ToolCall("clarify", {"questions": [
+        "LIVE08": lambda: ToolCall("clarify", {"context": "LIVE08 context.", "questions": [
             {"question": "LIVE08 which colour?", "choices": ["red", "blue"]},
             {"question": "LIVE08 which size?", "choices": ["small", "large"]}]}),
         "LIVE09": lambda: ToolCall("delegate_task", {"goal": "LIVECHILD count the files in the work folder"}),
