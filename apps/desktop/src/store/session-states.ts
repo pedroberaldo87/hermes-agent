@@ -2512,6 +2512,7 @@ export function discardSessionTile(storedSessionId: string) {
  * discard (no ⌘⇧T) semantics as discardSessionTile — undoing the delete of the
  * owning profile would resolve to a 404 again.
  */
+// health: allow CC -- tars/integration only: closed PR #148494 (per-view tabs) adds its view buckets to main's branches; drop when #148494 leaves the stack
 export function dropTilesForProfile(
   profile: string,
   route?: { connectionId?: string; profile?: string; targetProfile?: string }

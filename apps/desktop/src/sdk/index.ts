@@ -1,3 +1,4 @@
+// health: allow FILE_LINES -- tars/integration only: main sits at 1996 lines and the stacked Desktop PRs/patches add a few re-exports; drop when the stack shrinks
 /**
  * @hermes/plugin-sdk — THE plugin language. The vscode-module model: plugin
  * authors import exactly one module and get everything — they never touch
