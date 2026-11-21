@@ -189,7 +189,7 @@ describe('the main tab follows the view the user picks', () => {
     app.session.$selectedStoredSessionId.set('old-main')
     app.profile.enterAllProfilesView()
 
-    app.states.migrateTilesForProfile('old', 'new')
+    await app.states.migrateTilesForProfile('old', 'new')
     app.profile.selectProfile('new')
     expect(routed()).toBe(`${routePrefix()}old-main`)
 
@@ -222,7 +222,7 @@ describe('the main tab follows the view the user picks', () => {
     app.profile.enterAllProfilesView()
     app.states.openSessionTile('x', 'center', 'workspace', undefined, { ...SESSIONS, ownerProfile: 'old' })
 
-    app.states.migrateTilesForProfile('old', 'new')
+    await app.states.migrateTilesForProfile('old', 'new')
 
     expect(app.states.$sessionTiles.get().map(tile => tile.ownerProfile)).toEqual(['new'])
   })
