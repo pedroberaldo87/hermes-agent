@@ -27,6 +27,10 @@ def accepts_keyword_argument(callable_obj: Any, name: str) -> bool:
 
 
 class SummaryDispatchMixin:
+    def _summary_route_identity(self) -> tuple[str, str, str]:
+        """The summary route as configured now: a flat-shape verdict belongs to this identity, not the session."""
+        return (self.summary_model or "", self.provider or "", self.base_url or "")
+
     def _apply_summary_route(self, call_kwargs: dict, pinned: Optional[dict[str, Any]] = None) -> None:
         """Pin the summary route onto ``call_kwargs`` for both compression entry points.
 
