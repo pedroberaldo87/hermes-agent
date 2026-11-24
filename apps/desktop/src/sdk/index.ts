@@ -1,3 +1,4 @@
+// health: allow FILE_LINES -- tars/integration only: main sits at the 2000-line target and local patches 20 and 52 add 4 lines; drop when they leave the stack
 /**
  * @hermes/plugin-sdk — THE plugin language. The vscode-module model: plugin
  * authors import exactly one module and get everything — they never touch
